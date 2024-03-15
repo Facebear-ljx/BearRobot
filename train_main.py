@@ -44,10 +44,10 @@ d4rl_iterator = iter(d4rl_dataloader)
 model = MLPDiffusion(17, 17).to(device)
 test_ddpm = DDPM(model)
 d4rl_dataset = D4RLDataset('halfcheetah-medium-v2')
-d4rl_dataloader = DataLoader(d4rl_dataset, batch_size=64, shuffle=True, num_workers=8)
-wandb_logger = WandbLogger(project_name='name', config={})
+d4rl_dataloader = DataLoader(d4rl_dataset, batch_size=256, shuffle=True, num_workers=8)
+wandb_logger = WandbLogger(project_name='name', config={"nothing": None})
 test_trainer = DiffusionTrainer(test_ddpm, d4rl_dataloader, d4rl_dataloader, wandb_logger, device='cuda')
-test_trainer.train_epoch(100)
+test_trainer.train_epoch(250)
 
 for _ in range(1000):
        start_time = time.time()

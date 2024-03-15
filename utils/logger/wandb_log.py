@@ -17,8 +17,12 @@ class WandbLogger(BaseLogger):
               """
               project_name (str): wandb project name
               config (dict): dict
-              """
-              wandb.init(project=project_name, config=config)
+              """              
+              wandb.init(project=project_name, 
+                         config=config,
+                         monitor_gym=False,  # do not record system info (e.g. GPU/CPU utils)
+              )
+
               self.config = wandb.config
 
     def log_metrics(self, metrics, step=None):
