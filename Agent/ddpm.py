@@ -72,25 +72,7 @@ SCHEDULE = {'linear': linear_beta_schedule,
             'cosine': cosine_beta_schedule,
             'sigmoid': sigmoid_beta_schedule,
             'vp': vp_beta_schedule}
-
-
-# sinusoidal positional embeds
-class SinusoidalPosEmb(nn.Module):
-       def __init__(self, output_size):
-              super().__init__()
-              self.output_size = output_size
-              
-       def forward(self, x):
-              device = x.device
-              half_dim = self.output_size // 2
-              f = math.log(10000) / (half_dim - 1)
-              f = torch.exp(torch.arange(half_dim, device=device) * -f)
-              f = x[:, None] * f[None, :]
-              f = torch.cat([f.cos(), f.sin()], axis=-1)
-              return f
                      
-
-
 class DDPM():
        def __init__(
               self, 
@@ -162,10 +144,9 @@ class DDPM():
               sample x0 from xT, reverse process
               """
               img = torch.randn(shape, device=self.device)
-              imgs = [img]
               
               for t in reversed(range(self.num_timesteps)):
-                     img = self.p_sample(img, torch.full((shape[0],), t, dtype=torch.float32, device=self.device))
+                     img = self.p_sample(img, torch.full((shape[0],), t, dtype=torch.float32, device=self.device), cond)
               return img
 
 
@@ -173,8 +154,5 @@ if __name__ == '__main__':
        timesteps = 100
        schedule = SCHEDULE['linear']
        print(schedule(timesteps)[0])
-       
-       embed = SinusoidalPosEmb(128)
-       embeded_t = embed(torch.tensor((1.,)))
-       print(embeded_t)
+
        
