@@ -100,7 +100,7 @@ class DDPM(nn.Module):
               noise_pred = self.model(xt, t, cond)
               return noise_pred
        
-       def ddpm_loss(self, x0, cond=None):
+       def loss(self, x0, cond=None):
               '''
               calculate ddpm loss
               '''
