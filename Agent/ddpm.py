@@ -4,6 +4,19 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
+
+def extract(a, x_shape):
+       '''
+       align the dimention of alphas_cumprod_t to x_shape
+       
+       a: alphas_cumprod_t, B
+       x_shape: B x F x F x F
+       output: alphas_cumprod_t B x 1 x 1 x 1]
+       '''
+       b, *_ = a.shape
+       return a.reshape(b, *((1,) * (len(x_shape) - 1)))
+
+
 def linear_beta_schedule(timesteps):
        """
        linear schedule, proposed in original ddpm paper
@@ -83,17 +96,77 @@ class DDPM():
               self, 
               model, 
               schedule='cosine',
+              num_timesteps=1000,
        ):
-              super().__init__()
+              super(DDPM, self).__init__()
               self.model = model
-              self.time_model = SinusoidalPosEmb(128)
-              self.schedule = SCHEDULE[schedule]
-
-       def forward(self, x, t, cond=None):
-              x_flat = x.view(x.size(0), -1)
-              noise_pred = self.predictor(x_flat)
               
-              return noise_pred.view_as(x)
+              self.device = model.device
+              self.schedule = SCHEDULE[schedule]
+              
+              self.num_timesteps = num_timesteps
+              self.betas = self.schedule(self.num_timesteps).to(self.device)
+              self.alphas = (1 - self.betas).to(self.device)
+              self.alphas_cumprod = torch.cumprod(self.alphas, dim=0).to(self.device)
+
+       def forward(self, xt, t, cond=None):
+              """
+              predict the noise
+              """
+              noise_pred = self.model(xt, t, cond)
+              return noise_pred
+       
+       def ddpm_loss(self, x0, cond=None):
+              '''
+              calculate ddpm loss
+              '''
+              batch_size = x0.shape[0]
+              
+              noise = torch.randn_like(x0, device=self.device)
+              t = torch.randint(0, self.num_timesteps, (batch_size, ), device=self.device)
+              
+              xt = self.q_sample(x0, t, noise)
+              
+              noise_pred = self.forward(xt, t, cond)
+              loss = F.mse_loss(noise_pred, noise)
+              
+              return loss
+              
+       def q_sample(self, x0, t, noise):
+              """
+              sample noisy xt from x0, q(xt|x0), forward process
+              """
+              alphas_cumprod_t = self.alphas_cumprod[t]
+              xt = x0 * extract(torch.sqrt(alphas_cumprod_t), x0.shape) + noise * extract(torch.sqrt(1 - alphas_cumprod_t), x0.shape)
+              return xt
+       
+       @torch.no_grad()
+       def p_sample(self, xt, t, cond=None, guidance_strength=0):
+              """
+              sample xt-1 from xt, p(xt-1|xt)
+              """
+              noise_pred = self.forward(xt, t, cond)
+              
+              alpha1 = 1 / torch.sqrt(self.alphas[t])
+              alpha2 = (1 - self.alphas[t])(torch.sqrt(1 - self.alphas_cumprod[t]))
+              
+              xtm1 = alpha1 * (xt - alpha2 * noise_pred)
+              
+              noise = torch.randn_like(xtm1, device=self.device)
+              xtm1 = xtm1 + (t > 0) * (torch.sqrt(self.betas[t]) * noise)
+              return xtm1
+       
+       @torch.no_grad()
+       def ddpm_sampler(self, shape, cond=None, guidance_strength=0):
+              """
+              sample x0 from xT, reverse process
+              """
+              img = torch.randn(shape, device=self.device)
+              imgs = [img]
+              
+              for t in reversed(range(self.num_timesteps)):
+                     img = self.p_sample(img, torch.full((shape[0],), t, dtype=torch.float32, device=self.device))
+              return img
 
 
 if __name__ == '__main__':
@@ -102,6 +175,6 @@ if __name__ == '__main__':
        print(schedule(timesteps)[0])
        
        embed = SinusoidalPosEmb(128)
-       embeded_t = embed(torch.tensor(1.))
+       embeded_t = embed(torch.tensor((1.,)))
        print(embeded_t)
        
