@@ -12,6 +12,9 @@ from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms as T
 
 import d4rl
+import gym
+
+EPS = 1e-5
 
 OPENXDATASETS = [
     'kaist_nonprehensile_converted_externally_to_rlds',#1
@@ -74,15 +77,51 @@ OPENXDATASETS = [
 class D4RLDataset(Dataset):
        def __init__(
               self,
+              env_name,
+              norm_dict = {"norm_s": True,
+                           "norm_a": False,
+                           "norm_r": True},
        ):
               super().__init__()
               
+              env = gym.make(env_name)
+              self.dataset = d4rl.qlearning_dataset(env, terminate_on_end=True)  # dict with np.array
+              self._get_statistics()
+              self._normalize_dataset(**norm_dict)
+              self._tran2tensor()
+       
+       def _get_statistics(self):
+              self.dataset_num = self.dataset['observations'].shape[0]
+              self.s_mean = self.dataset['observations'].mean(axis=0, keepdims=True)
+              self.s_std = self.dataset['observations'].std(axis=0, keepdims=True)
+              self.a_mean = self.dataset['actions'].mean(axis=0, keepdims=True)
+              self.a_std = self.dataset['actions'].mean(axis=0, keepdims=True)
+              self.r_mean = self.dataset['rewards'].mean()
+              self.r_std = self.dataset['rewards'].mean()
+       
+       def _normalize_dataset(self, norm_s=False, norm_a=False, norm_r=False):
+              if norm_s:
+                     self.dataset['observations'] = (self.dataset['observations'] - self.s_mean) / (self.s_std + EPS)
+                     self.dataset['next_observations'] = (self.dataset['next_observations'] - self.s_mean) / (self.s_std + EPS)
+              if norm_a:
+                     self.dataset['actions'] = (self.dataset['actions'] - self.a_mean) / (self.a_std + EPS)
+              if norm_r:
+                     self.dataset['rewards'] = (self.dataset['rewards'] - self.r_mean) / (self.r_std + EPS)
+                     
+       def _tran2tensor(self):
+              for key in ['observations', 'actions', 'rewards', 'next_observations', 'terminals']:
+                     self.dataset[key] = torch.from_numpy(self.dataset[key]).to(torch.float32).view(self.dataset_num, -1)
        
        def __len__(self):
-              pass
+              return self.dataset_num
 
-       def __getitem__(self, index):
-              pass
+       def __getitem__(self, idx):
+              s = self.dataset['observations'][idx]
+              a = self.dataset['actions'][idx]
+              r = self.dataset['rewards'][idx]
+              next_s = self.dataset['next_observations'][idx]
+              d = 1. - self.dataset['terminals'][idx]
+              return {"s": s, "a": a, "r": r, "next_s": next_s, "d": d}
        
 
 class AIROpenXDataset(Dataset):
