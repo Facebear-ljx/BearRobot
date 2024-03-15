@@ -24,7 +24,7 @@ def linear_beta_schedule(timesteps):
        scale = 1000 / timesteps
        beta_start = scale * 0.0001
        beta_end = scale * 0.02
-       return torch.linspace(beta_start, beta_end, timesteps, dtype = torch.float64)
+       return torch.linspace(beta_start, beta_end, timesteps)
 
 
 def cosine_beta_schedule(timesteps, s=0.008):
@@ -33,7 +33,7 @@ def cosine_beta_schedule(timesteps, s=0.008):
        as proposed in https://openreview.net/forum?id=-NEXDKk8gZ
        """
        steps = timesteps + 1
-       t = torch.linspace(0, timesteps, steps, dtype = torch.float64) / timesteps
+       t = torch.linspace(0, timesteps, steps) / timesteps
        alphas_cumprod = torch.cos((t + s) / (1 + s) * math.pi * 0.5) ** 2
        alphas_cumprod = alphas_cumprod / alphas_cumprod[0]
        betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
@@ -47,7 +47,7 @@ def sigmoid_beta_schedule(timesteps, start = -3, end = 3, tau = 1, clamp_min = 1
        better for images > 64x64, when used during training
        """
        steps = timesteps + 1
-       t = torch.linspace(0, timesteps, steps, dtype = torch.float64) / timesteps
+       t = torch.linspace(0, timesteps, steps) / timesteps
        v_start = torch.tensor(start / tau).sigmoid()
        v_end = torch.tensor(end / tau).sigmoid()
        alphas_cumprod = (-((t * (end - start) + start) / tau).sigmoid() + v_end) / (v_end - v_start)
@@ -73,7 +73,7 @@ SCHEDULE = {'linear': linear_beta_schedule,
             'sigmoid': sigmoid_beta_schedule,
             'vp': vp_beta_schedule}
                      
-class DDPM():
+class DDPM(nn.Module):
        def __init__(
               self, 
               model, 
@@ -84,6 +84,8 @@ class DDPM():
               self.model = model
               
               self.device = model.device
+              if schedule not in SCHEDULE.keys():
+                     raise ValueError(f"Invalid schedule '{schedule}'. Expected one of: {list(SCHEDULE.keys())}")
               self.schedule = SCHEDULE[schedule]
               
               self.num_timesteps = num_timesteps
@@ -130,7 +132,7 @@ class DDPM():
               noise_pred = self.forward(xt, t, cond)
               
               alpha1 = 1 / torch.sqrt(self.alphas[t])
-              alpha2 = (1 - self.alphas[t])(torch.sqrt(1 - self.alphas_cumprod[t]))
+              alpha2 = (1 - self.alphas[t]) / (torch.sqrt(1 - self.alphas_cumprod[t]))
               
               xtm1 = alpha1 * (xt - alpha2 * noise_pred)
               
@@ -146,7 +148,7 @@ class DDPM():
               img = torch.randn(shape, device=self.device)
               
               for t in reversed(range(self.num_timesteps)):
-                     img = self.p_sample(img, torch.full((shape[0],), t, dtype=torch.float32, device=self.device), cond)
+                     img = self.p_sample(img, torch.full((shape[0], 1), t, device=self.device), cond)
               return img
 
 
