@@ -8,6 +8,7 @@ class BaseEval():
               data_statistics: dict,
               logger: BaseLogger,
        ):
+              super().__init__()
               self.num_episodes = num_episodes
               self.eval_freq = eval_freq
               self.data_statistics = data_statistics

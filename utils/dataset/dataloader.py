@@ -116,7 +116,7 @@ class D4RLDataset(Dataset):
                      self.dataset[key] = torch.from_numpy(self.dataset[key]).to(torch.float32).view(self.data_statistics["dataset_num"], -1)
        
        def __len__(self):
-              return self.dataset_num
+              return self.data_statistics["dataset_num"]
 
        def __getitem__(self, idx):
               s = self.dataset['observations'][idx]

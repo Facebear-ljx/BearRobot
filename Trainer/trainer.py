@@ -7,13 +7,14 @@ from tqdm import tqdm
 
 OPTIMIZER = {"adam": torch.optim.Adam}
 
-class DiffusionTrainer:
+class DiffusionBCTrainer:
        def __init__(
               self,
               diffusion,
               train_dataloader,
               val_dataloader,
               logger,
+              evaluator,
               lr=1e-4,
               optimizer='adam',
               device='cpu',
@@ -32,19 +33,24 @@ class DiffusionTrainer:
               self.logger = logger
               self.device = device
               
+              # evaluator
+              self.evaluator = evaluator
+              
        def train_epoch(self, epochs):
               """
               train some epochs
               """
               self.diffusion.train()
+              self.evaluator.eval_episodes(self.diffusion, 0)
               for epoch in range(0, epochs):
                      epoch_loss = 0.
                      with tqdm(self.train_dataloader, unit="batch") as pbar:
                             for batch in pbar:
-                                   s = batch['s'].to(self.device)
+                                   cond = batch['s'].to(self.device)
+                                   x = batch['a'].to(self.device)
                                    
                                    self.optimizer.zero_grad()
-                                   loss = self.diffusion.loss(s)
+                                   loss = self.diffusion.loss(x, cond)
                                    loss.backward()
                                    self.optimizer.step()
                                    
@@ -53,6 +59,7 @@ class DiffusionTrainer:
                      
                      avg_loss = epoch_loss / len(self.train_dataloader)
                      self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
+                     self.evaluator.eval_episodes(self.diffusion, epoch+1)
                      print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
               
               self.logger.finish()

@@ -34,16 +34,18 @@ class MLPDiffusion(nn.Module):
               self, 
               input_dim,
               output_dim,
-              cond=True,
+              cond_dim=0,
               time_embeding='fixed',
        ):
               super(MLPDiffusion, self).__init__()
               self.input_dim = input_dim
               self.output_dim = output_dim
+                
+              self.cond_dim = cond_dim
               
               # base encoder
               hidden_size = 256
-              self.base_model = MLP(input_dim, [hidden_size, hidden_size], hidden_size)
+              self.base_model = MLP(input_dim+cond_dim, [hidden_size, hidden_size], hidden_size)
               
               # time embedding
               if time_embeding not in TIMEEMBED.keys():
@@ -58,6 +60,8 @@ class MLPDiffusion(nn.Module):
        def forward(self, xt, t, cond=None):
               # encode
               time_embedding = self.time_process(t.view(-1, 1))
+              if cond is not None:
+                     xt = torch.concat([xt, cond], dim=-1)
               base_embedding = self.base_model(xt)
               embedding = torch.cat([time_embedding, base_embedding], dim=-1)
               
