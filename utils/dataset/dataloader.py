@@ -78,38 +78,55 @@ class D4RLDataset(Dataset):
        def __init__(
               self,
               env_name,
-              norm_dict = {"norm_s": True,
+              norm_dict = {"norm_s": False,
                            "norm_a": False,
-                           "norm_r": True},
+                           "norm_r": False},
        ):
               super().__init__()
               
               env = gym.make(env_name)
               self.dataset = d4rl.qlearning_dataset(env, terminate_on_end=True)  # dict with np.array
-              self._get_statistics()
               self._normalize_dataset(**norm_dict)
               self._tran2tensor()
        
-       
-       def _get_statistics(self):
-              self.data_statistics = {
-                     "dataset_num" : self.dataset['observations'].shape[0],
-                     "s_mean" : self.dataset['observations'].mean(axis=0, keepdims=True),
-                     "s_std" : self.dataset['observations'].std(axis=0, keepdims=True),
-                     "a_mean" : self.dataset['actions'].mean(axis=0, keepdims=True),
-                     "a_std" : self.dataset['actions'].mean(axis=0, keepdims=True),
-                     "r_mean" : self.dataset['rewards'].mean(),
-                     "r_std" : self.dataset['rewards'].mean(),              
-              }
-       
+             
        def _normalize_dataset(self, norm_s=False, norm_a=False, norm_r=False):
               if norm_s:
-                     self.dataset['observations'] = (self.dataset['observations'] - self.data_statistics['s_mean']) / (self.data_statistics['s_std'] + EPS)
-                     self.dataset['next_observations'] = (self.dataset['next_observations'] - self.data_statistics['s_mean']) / (self.data_statistics['s_std'] + EPS)
+                     s_mean = self.dataset['observations'].mean(axis=0, keepdims=True)
+                     s_std = self.dataset['observations'].std(axis=0, keepdims=True)
+              else:
+                     s_mean = np.zeros_like(self.dataset['observations'].mean(axis=0, keepdims=True))
+                     s_std = np.ones_like(self.dataset['observations'].std(axis=0, keepdims=True))
+                     
               if norm_a:
-                     self.dataset['actions'] = (self.dataset['actions'] - self.data_statistics['a_mean']) / (self.data_statistics['a_std'] + EPS)
+                     a_mean = self.dataset['actions'].mean(axis=0, keepdims=True)
+                     a_std = self.dataset['actions'].std(axis=0, keepdims=True)
+              else:
+                     a_mean = np.zeros_like(self.dataset['actions'].mean(axis=0, keepdims=True))
+                     a_std = np.ones_like(self.dataset['actions'].std(axis=0, keepdims=True))
+                     
               if norm_r:
-                     self.dataset['rewards'] = (self.dataset['rewards'] - self.data_statistics['r_mean']) / (self.data_statistics['r_std'] + EPS)
+                     r_mean = self.dataset['rewards'].mean()
+                     r_std = self.dataset['rewards'].std()
+              else:
+                     r_mean = np.zeros_like(self.dataset['rewards'].mean())
+                     r_std = np.ones_like(self.dataset['rewards'].std())
+                     
+              self.dataset['observations'] = (self.dataset['observations'] - s_mean) / (s_std + EPS)
+              self.dataset['next_observations'] = (self.dataset['next_observations'] - s_mean) / (s_std + EPS)
+              self.dataset['actions'] = (self.dataset['actions'] - a_mean) / (a_std + EPS)
+              self.dataset['rewards'] = (self.dataset['rewards'] - r_mean) / (r_std + EPS)
+              
+              self.data_statistics = {
+                     "dataset_num" : self.dataset['observations'].shape[0],
+                     "s_mean" : s_mean,
+                     "s_std" : s_std,
+                     "a_mean" : a_mean,
+                     "a_std" : a_std,
+                     "r_mean" : r_mean,
+                     "r_std" : r_std,              
+              }
+              
                      
        def _tran2tensor(self):
               for key in ['observations', 'actions', 'rewards', 'next_observations', 'terminals']:

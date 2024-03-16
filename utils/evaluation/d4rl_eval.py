@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 import d4rl
 import gym
@@ -21,7 +22,7 @@ class D4RLEval(BaseEval):
               super(BaseEval, self).__init__()   
               self.env_name = env_name
               self.env = gym.make(env_name)
-              self.datadata_statistics = data_statistics
+              self.data_statistics = data_statistics
               
               self.num_episodes = num_episodes
               self.eval_freq = eval_freq
@@ -42,9 +43,16 @@ class D4RLEval(BaseEval):
               ep_rews = 0.
               state = self.env.reset()
               while True:
-                     state = (state - self.datadata_statistics['s_mean']) / (self.datadata_statistics['s_std'] + EPS)
+                     # norm state
+                     state = (state - self.data_statistics['s_mean']) / (self.data_statistics['s_std'] + EPS)
                      state = torch.from_numpy(state).to(policy.device).float()
-                     action = policy.get_action(state).view(-1).cpu().detach().numpy()
+                     
+                     # get action and denorm
+                     action = policy.get_action(state).cpu().detach().numpy()
+                     action = action * (self.data_statistics['a_std'] + EPS) + self.data_statistics['a_mean']
+                     action = action.reshape(-1)
+                     
+                     # step
                      state, reward, done, _ = self.env.step(action)
                      ep_rews += reward
                      if done:

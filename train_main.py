@@ -42,7 +42,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # test Trainer
 model = IDQLDiffusion(6, 6, 17, device=device).to(device)
-test_ddpm = DDPM_Agent(model, num_timesteps=15)
+test_ddpm = DDPM_BC(model, num_timesteps=15)
 
 env_name = 'halfcheetah-medium-v2'
 d4rl_dataset = D4RLDataset(env_name)
