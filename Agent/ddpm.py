@@ -3,6 +3,7 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from Agent.base_agent import BaseAgent
 
 
 def extract(a, x_shape):
@@ -73,14 +74,14 @@ SCHEDULE = {'linear': linear_beta_schedule,
             'sigmoid': sigmoid_beta_schedule,
             'vp': vp_beta_schedule}
                      
-class DDPM(nn.Module):
+class DDPM(BaseAgent):
        def __init__(
               self, 
               model, 
               schedule='cosine',
               num_timesteps=1000,
        ):
-              super(DDPM, self).__init__()
+              super(BaseAgent, self).__init__()
               self.model = model
               
               self.device = model.device
@@ -145,12 +146,16 @@ class DDPM(nn.Module):
               """
               sample x0 from xT, reverse process
               """
-              img = torch.randn(shape, device=self.device)
+              x = torch.randn(shape, device=self.device)
               
               for t in reversed(range(self.num_timesteps)):
-                     img = self.p_sample(img, torch.full((shape[0], 1), t, device=self.device), cond)
-              return img
+                     x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), cond)
+              return x
 
+       @torch.no_grad()
+       def get_action(self, state):
+              return self.ddpm_sampler((1, self.model.output_dim), cond=state)
+       
 
 if __name__ == '__main__':
        timesteps = 100
