@@ -90,27 +90,30 @@ class D4RLDataset(Dataset):
               self._normalize_dataset(**norm_dict)
               self._tran2tensor()
        
+       
        def _get_statistics(self):
-              self.dataset_num = self.dataset['observations'].shape[0]
-              self.s_mean = self.dataset['observations'].mean(axis=0, keepdims=True)
-              self.s_std = self.dataset['observations'].std(axis=0, keepdims=True)
-              self.a_mean = self.dataset['actions'].mean(axis=0, keepdims=True)
-              self.a_std = self.dataset['actions'].mean(axis=0, keepdims=True)
-              self.r_mean = self.dataset['rewards'].mean()
-              self.r_std = self.dataset['rewards'].mean()
+              self.data_statistics = {
+                     "dataset_num" : self.dataset['observations'].shape[0],
+                     "s_mean" : self.dataset['observations'].mean(axis=0, keepdims=True),
+                     "s_std" : self.dataset['observations'].std(axis=0, keepdims=True),
+                     "a_mean" : self.dataset['actions'].mean(axis=0, keepdims=True),
+                     "a_std" : self.dataset['actions'].mean(axis=0, keepdims=True),
+                     "r_mean" : self.dataset['rewards'].mean(),
+                     "r_std" : self.dataset['rewards'].mean(),              
+              }
        
        def _normalize_dataset(self, norm_s=False, norm_a=False, norm_r=False):
               if norm_s:
-                     self.dataset['observations'] = (self.dataset['observations'] - self.s_mean) / (self.s_std + EPS)
-                     self.dataset['next_observations'] = (self.dataset['next_observations'] - self.s_mean) / (self.s_std + EPS)
+                     self.dataset['observations'] = (self.dataset['observations'] - self.data_statistics['s_mean']) / (self.data_statistics['s_std'] + EPS)
+                     self.dataset['next_observations'] = (self.dataset['next_observations'] - self.data_statistics['s_mean']) / (self.data_statistics['s_std'] + EPS)
               if norm_a:
-                     self.dataset['actions'] = (self.dataset['actions'] - self.a_mean) / (self.a_std + EPS)
+                     self.dataset['actions'] = (self.dataset['actions'] - self.data_statistics['a_mean']) / (self.data_statistics['a_std'] + EPS)
               if norm_r:
-                     self.dataset['rewards'] = (self.dataset['rewards'] - self.r_mean) / (self.r_std + EPS)
+                     self.dataset['rewards'] = (self.dataset['rewards'] - self.data_statistics['r_mean']) / (self.data_statistics['r_std'] + EPS)
                      
        def _tran2tensor(self):
               for key in ['observations', 'actions', 'rewards', 'next_observations', 'terminals']:
-                     self.dataset[key] = torch.from_numpy(self.dataset[key]).to(torch.float32).view(self.dataset_num, -1)
+                     self.dataset[key] = torch.from_numpy(self.dataset[key]).to(torch.float32).view(self.data_statistics["dataset_num"], -1)
        
        def __len__(self):
               return self.dataset_num
