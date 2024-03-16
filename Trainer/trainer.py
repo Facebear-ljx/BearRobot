@@ -1,6 +1,9 @@
+import copy
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 
 from tqdm import tqdm
 
@@ -21,11 +24,13 @@ class DiffusionBCTrainer:
               logger: BaseLogger,
               evaluator: BaseEval,
               lr: float=1e-4,
+              ema: float=1e-3,
               optimizer: str='adam',
               device: str='cpu',
        ):
               # model
               self.diffusion_agent = diffusion_agent
+              self.target_diffusion_agent = copy.deepcopy(self.diffusion_agent)
               
               # dataloader
               self.train_dataloader = train_dataloader
@@ -33,6 +38,7 @@ class DiffusionBCTrainer:
               
               # optimizer
               self.optimizer = OPTIMIZER[optimizer](self.diffusion_agent.parameters(), lr=lr)
+              self.ema = ema
               
               # logger
               self.logger = logger
@@ -61,25 +67,24 @@ class DiffusionBCTrainer:
                                    
                                    pbar.set_description(f"Epoch {epoch} Loss: {loss.item():.4f}")
                                    epoch_loss += loss.item()
-                     
+                                   self.ema_update()
+                                   
                      avg_loss = epoch_loss / len(self.train_dataloader)
                      self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
                      print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
                      
                      if (epoch + 1) % self.evaluator.eval_freq == 0:
-                            rewards = self.evaluator.eval_episodes(self.diffusion_agent, epoch+1)
+                            rewards = self.evaluator.eval_episodes(self.target_diffusion_agent, epoch+1)
                             print(f"Epoch {epoch} Average return: {rewards:.4f}")
               
               self.logger.finish()
                      
-                            
-       
        def train_steps(self, steps: int):
               """
               train some steps
               """
               self.diffusion_agent.train()
-              self.evaluator.eval_episodes(self.diffusion_agent, 0)
+              self.evaluator.eval_episodes(self.target_diffusion_agent, 0)
               
               iterator = iter(self.train_dataloader)
               for step in tqdm(range(steps)):
@@ -98,14 +103,19 @@ class DiffusionBCTrainer:
                      loss = self.diffusion_agent.loss(x, cond)
                      loss.backward()
                      self.optimizer.step()
+                     self.ema_update()
                      
                      self.logger.log_metrics({"train/loss": loss.item()}, step=step)
                      
                      if (step + 1) % self.evaluator.eval_freq == 0:
-                            rewards = self.evaluator.eval_episodes(self.diffusion_agent, step)
+                            rewards = self.evaluator.eval_episodes(self.target_diffusion_agent, step)
                             print(f"Epoch {step} Average return: {rewards:.4f}")
               
               self.logger.finish()
+       
+       def ema_update(self):
+              for param, target_param in zip(self.diffusion_agent.parameters(), self.target_diffusion_agent.parameters()):
+                     target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
               
        def save_model(self, path: str):
               """
