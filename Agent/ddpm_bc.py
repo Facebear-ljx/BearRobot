@@ -74,7 +74,7 @@ SCHEDULE = {'linear': linear_beta_schedule,
             'sigmoid': sigmoid_beta_schedule,
             'vp': vp_beta_schedule}
                      
-class DDPM_Agent(BaseAgent):
+class DDPM_BC(BaseAgent):
        def __init__(
               self, 
               model, 
@@ -126,7 +126,7 @@ class DDPM_Agent(BaseAgent):
               return xt
        
        @torch.no_grad()
-       def p_sample(self, xt, t, cond=None, guidance_strength=0):
+       def p_sample(self, xt, t, cond=None, guidance_strength=0, clip_sample=True, ddpm_temperature=1.):
               """
               sample xt-1 from xt, p(xt-1|xt)
               """
@@ -137,8 +137,11 @@ class DDPM_Agent(BaseAgent):
               
               xtm1 = alpha1 * (xt - alpha2 * noise_pred)
               
-              noise = torch.randn_like(xtm1, device=self.device)
+              noise = torch.randn_like(xtm1, device=self.device) * ddpm_temperature
               xtm1 = xtm1 + (t > 0) * (torch.sqrt(self.betas[t]) * noise)
+              
+              if clip_sample:
+                     xtm1 = torch.clip(xtm1, -1., 1.)
               return xtm1
        
        @torch.no_grad()

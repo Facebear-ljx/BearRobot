@@ -64,8 +64,11 @@ class DiffusionBCTrainer:
                      
                      avg_loss = epoch_loss / len(self.train_dataloader)
                      self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
-                     rewards = self.evaluator.eval_episodes(self.diffusion_agent, epoch+1)
-                     print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}, Average return: {rewards:.4f}")
+                     print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
+                     
+                     if (epoch + 1) % self.evaluator.eval_freq == 0:
+                            rewards = self.evaluator.eval_episodes(self.diffusion_agent, epoch+1)
+                            print(f"Epoch {epoch} Average return: {rewards:.4f}")
               
               self.logger.finish()
                      

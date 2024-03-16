@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from Net.my_model.diffusion_model import MLPDiffusion, IDQLDiffusion
-from Agent.ddpm import DDPM_Agent
+from Agent.ddpm_bc import DDPM_BC
 from utils.dataset.dataloader import AIROpenXDataset, D4RLDataset
 from Trainer.trainer import DiffusionBCTrainer
 from utils.evaluation.d4rl_eval import D4RLEval
@@ -48,6 +48,6 @@ env_name = 'halfcheetah-medium-v2'
 d4rl_dataset = D4RLDataset(env_name)
 d4rl_dataloader = DataLoader(d4rl_dataset, batch_size=256, shuffle=True, num_workers=8)
 wandb_logger = WandbLogger(project_name='name', config={"nothing": None})
-evaluator = D4RLEval(env_name, d4rl_dataset.data_statistics, wandb_logger, 10)
+evaluator = D4RLEval(env_name, d4rl_dataset.data_statistics, wandb_logger, 10, 10)
 test_trainer = DiffusionBCTrainer(test_ddpm, d4rl_dataloader, d4rl_dataloader, wandb_logger, evaluator, lr=3e-4, device=device)
 test_trainer.train_epoch(250)    
