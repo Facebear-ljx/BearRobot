@@ -41,13 +41,14 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # d4rl_iterator = iter(d4rl_dataloader)
 
 # test Trainer
-model = IDQLDiffusion(6, 6, 17, device=device).to(device)
-test_ddpm = DDPM_BC(model, num_timesteps=15)
-
-env_name = 'halfcheetah-medium-v2'
+env_name = 'hopper-medium-v2'
 d4rl_dataset = D4RLDataset(env_name)
-d4rl_dataloader = DataLoader(d4rl_dataset, batch_size=256, shuffle=True, num_workers=8)
-wandb_logger = WandbLogger(project_name='name', config={"nothing": None})
-evaluator = D4RLEval(env_name, d4rl_dataset.data_statistics, wandb_logger, 10, 10)
+d4rl_dataloader = DataLoader(d4rl_dataset, batch_size=1024, shuffle=True, num_workers=8)
+
+model = IDQLDiffusion(d4rl_dataset.a_dim, d4rl_dataset.a_dim, d4rl_dataset.s_dim, device=device).to(device)
+test_ddpm = DDPM_BC(model, num_timesteps=5)
+
+wandb_logger = WandbLogger(project_name='name', run_name=env_name, config={"env_name": env_name})
+evaluator = D4RLEval(env_name, d4rl_dataset.data_statistics, wandb_logger, 10, 25000)
 test_trainer = DiffusionBCTrainer(test_ddpm, d4rl_dataloader, d4rl_dataloader, wandb_logger, evaluator, lr=3e-4, device=device)
-test_trainer.train_epoch(250)    
+test_trainer.train_steps(int(1e+6))    

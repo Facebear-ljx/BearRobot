@@ -70,7 +70,7 @@ class D4RLEval(BaseEval):
               for _ in range(self.num_episodes):
                      rews.append(self._rollout(policy))
               eval_rewards = sum(rews) / len(rews)
-              metrics = {"eval/rewars": eval_rewards}
+              metrics = {"eval/rewards": eval_rewards}
               self._log_results(metrics, steps)
               return eval_rewards
               

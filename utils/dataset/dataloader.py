@@ -88,6 +88,9 @@ class D4RLDataset(Dataset):
               self.dataset = d4rl.qlearning_dataset(env, terminate_on_end=True)  # dict with np.array
               self._normalize_dataset(**norm_dict)
               self._tran2tensor()
+              
+              self.s_dim = self.data_statistics['s_mean'].shape[1]
+              self.a_dim = self.data_statistics['a_mean'].shape[1]
        
              
        def _normalize_dataset(self, norm_s=False, norm_a=False, norm_r=False):

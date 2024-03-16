@@ -3,7 +3,7 @@ import wandb
 from utils.logger.base_log import BaseLogger
 
 class WandbLogger(BaseLogger):
-    def __init__(self, project_name, config):
+    def __init__(self, project_name, run_name, config):
               super().__init__(config)
               """
               project_name (str): wandb project name
@@ -14,6 +14,7 @@ class WandbLogger(BaseLogger):
                          monitor_gym=False,  # do not record system info (e.g. GPU/CPU utils)
               )
 
+              wandb.run.name = run_name
               self.config = wandb.config
 
     def log_metrics(self, metrics: dict, step: int):

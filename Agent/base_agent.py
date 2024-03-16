@@ -13,3 +13,6 @@ class BaseAgent(nn.Module):
        
        def load(self, ckpt_path):
               pass
+       
+       def loss(self):
+              pass

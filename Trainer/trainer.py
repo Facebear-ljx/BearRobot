@@ -74,11 +74,38 @@ class DiffusionBCTrainer:
                      
                             
        
-       def train_steps(self, steps):
+       def train_steps(self, steps: int):
               """
-              train some gradient steps
+              train some steps
               """
-              pass
+              self.diffusion_agent.train()
+              self.evaluator.eval_episodes(self.diffusion_agent, 0)
+              
+              iterator = iter(self.train_dataloader)
+              for step in tqdm(range(steps)):
+                     # with tqdm(self.train_dataloader, unit="batch") as pbar:
+                     try:
+                            batch = next(iterator)
+                            
+                     except:
+                            iterator = iter(self.train_dataloader)
+                            batch = next(iterator)
+                            
+                     cond = batch['s'].to(self.device)
+                     x = batch['a'].to(self.device)
+                     
+                     self.optimizer.zero_grad()
+                     loss = self.diffusion_agent.loss(x, cond)
+                     loss.backward()
+                     self.optimizer.step()
+                     
+                     self.logger.log_metrics({"train/loss": loss.item()}, step=step)
+                     
+                     if (step + 1) % self.evaluator.eval_freq == 0:
+                            rewards = self.evaluator.eval_episodes(self.diffusion_agent, step)
+                            print(f"Epoch {step} Average return: {rewards:.4f}")
+              
+              self.logger.finish()
               
        def save_model(self, path: str):
               """
