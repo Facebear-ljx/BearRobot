@@ -3,7 +3,7 @@ import time
 import torch
 from torch.utils.data import DataLoader
 
-from Net.my_model.diffusion_model import MLPDiffusion
+from Net.my_model.diffusion_model import MLPDiffusion, IDQLDiffusion
 from Agent.ddpm import DDPM
 from utils.dataset.dataloader import AIROpenXDataset, D4RLDataset
 from Trainer.trainer import DiffusionBCTrainer
@@ -41,7 +41,7 @@ device = 'cuda' if torch.cuda.is_available() else 'cpu'
 # d4rl_iterator = iter(d4rl_dataloader)
 
 # test Trainer
-model = MLPDiffusion(6, 6, 17).to(device)
+model = IDQLDiffusion(6, 6, 17, device=device).to(device)
 test_ddpm = DDPM(model, num_timesteps=15)
 
 env_name = 'halfcheetah-medium-v2'
