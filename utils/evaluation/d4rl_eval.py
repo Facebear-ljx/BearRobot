@@ -64,6 +64,7 @@ class D4RLEval(BaseEval):
               eval_rewards = sum(rews) / len(rews)
               metrics = {"eval/rewars": eval_rewards}
               self._log_results(metrics, steps)
+              return eval_rewards
               
               
 

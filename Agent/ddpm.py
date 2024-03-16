@@ -74,7 +74,7 @@ SCHEDULE = {'linear': linear_beta_schedule,
             'sigmoid': sigmoid_beta_schedule,
             'vp': vp_beta_schedule}
                      
-class DDPM(BaseAgent):
+class DDPM_Agent(BaseAgent):
        def __init__(
               self, 
               model, 
