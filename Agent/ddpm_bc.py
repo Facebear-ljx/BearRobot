@@ -3,6 +3,8 @@ import math
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+import copy
+
 from Agent.base_agent import BaseAgent
 
 
@@ -77,9 +79,9 @@ SCHEDULE = {'linear': linear_beta_schedule,
 class DDPM_BC(BaseAgent):
        def __init__(
               self, 
-              model, 
-              schedule='cosine',
-              num_timesteps=1000,
+              model: torch.nn.Module, 
+              schedule: str='cosine',
+              num_timesteps: int=5,
        ):
               super(BaseAgent, self).__init__()
               self.model = model
@@ -101,7 +103,7 @@ class DDPM_BC(BaseAgent):
               noise_pred = self.model(xt, t, cond)
               return noise_pred
        
-       def loss(self, x0, cond=None):
+       def policy_loss(self, x0, cond=None):
               '''
               calculate ddpm loss
               '''
@@ -150,15 +152,83 @@ class DDPM_BC(BaseAgent):
               sample x0 from xT, reverse process
               """
               x = torch.randn(shape, device=self.device)
+              cond = cond.repeat(x.shape[0], 1)
               
               for t in reversed(range(self.num_timesteps)):
                      x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), cond)
               return x
 
        @torch.no_grad()
-       def get_action(self, state):
-              return self.ddpm_sampler((1, self.model.output_dim), cond=state)
+       def get_action(self, state, num=1):
+              return self.ddpm_sampler((num, self.model.output_dim), cond=state)
        
+
+class IDQL_Agent(BaseAgent):
+       def __init__(
+              self, 
+              policy: BaseAgent,
+              v_model: torch.nn.Module, 
+              q_models: torch.nn.Module,
+              num_sample: int=64,
+              gamma: float=0.99,
+              expectile: float=0.7,
+       ):       
+              super(BaseAgent, self).__init__()
+              self.policy = policy
+              self.policy_target = copy.deepcopy(policy)
+              self.v_model = v_model
+              self.q_models = q_models
+              self.q_models_target = copy.deepcopy(q_models)
+              
+              self.gamma = gamma
+              self.expectile = expectile
+              self.num_sample = num_sample
+              self.device = self.policy.device
+              
+
+       def q_loss(self, s, a, r, next_s, d):
+              target_q = r + self.gamma * d * self.v_model(next_s)
+              qs = self.q_models(s, a)
+              
+              loss = [F.mse_loss(q, target_q) for q in qs]
+              loss = sum(loss) / len(loss)
+              return loss
+       
+       
+       def v_loss(self, s, a):
+              target_v = torch.cat(self.q_models_target(s, a), axis=1).min(axis=1)[0]
+              v = self.v_model(s)
+              
+              loss = self.expectile_loss(target_v - v)
+              return loss, v.mean()
+       
+       
+       def policy_loss(self, x0, cond=None):
+              loss = self.policy.policy_loss(x0, cond)
+              return loss
+       
+       
+       def expectile_loss(self, diff):
+              weight = torch.where(diff > 0, self.expectile, (1 - self.expectile))
+              return torch.mean(weight * (diff**2))
+       
+       
+       @torch.no_grad
+       def get_action(self, state, from_target=True):
+              if from_target:
+                     actions = self.policy_target.get_action(state, self.num_sample)
+              else:
+                     actions = self.policy.get_action(state, self.num_sample)
+              
+              state = state.repeat(actions.shape[0], 1)
+              qs = torch.cat(self.q_models_target(state, actions), axis=1).min(axis=1)[0]
+              idx = torch.argmax(qs)
+              
+              action = actions[idx]
+              return action
+              
+              
+              
 
 if __name__ == '__main__':
        timesteps = 100

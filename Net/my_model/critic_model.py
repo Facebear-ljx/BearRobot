@@ -21,7 +21,7 @@ class MLPV(nn.Module):
               layer_norm: bool=False,
               dropout_rate: float=0.,
        ):
-              super(MLPV).__init__()
+              super().__init__()
               
               self.model = MLP(input_dim, hidden_size, output_dim, ac_fn, layer_norm, dropout_rate)
               
@@ -43,7 +43,7 @@ class MLPQ(nn.Module):
               layer_norm: bool=False,
               dropout_rate: float=0.,
        ):
-              super(MLPQ).__init__()
+              super().__init__()
               
               self.model = MLP(input_dim, hidden_size, output_dim, ac_fn, layer_norm, dropout_rate)
        
@@ -67,11 +67,11 @@ class MLPQs(nn.Module):
               layer_norm: bool=False,
               dropout_rate: float=0.,
        ):
-              super(MLPQs).__init__()
+              super().__init__()
               
               self.models = nn.ModuleList()
               for _ in range(ensemble_num):
-                     model = MLPQ(input_dim, hidden_size, output_dim, ac_fn, layer_norm, dropout_rate)
+                     model = MLPQ(input_dim, output_dim, hidden_size, ac_fn, layer_norm, dropout_rate)
                      self.models.append(model)
                      
        def forward(self, s, a):
