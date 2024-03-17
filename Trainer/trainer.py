@@ -3,7 +3,7 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
+from torch.optim.lr_scheduler import CosineAnnealingLR
 
 from tqdm import tqdm
 
@@ -23,6 +23,7 @@ class DiffusionBCTrainer:
               val_dataloader: DataLoader,
               logger: BaseLogger,
               evaluator: BaseEval,
+              num_steps: int,
               lr: float=1e-4,
               ema: float=1e-3,
               optimizer: str='adam',
@@ -40,6 +41,9 @@ class DiffusionBCTrainer:
               self.optimizer = OPTIMIZER[optimizer](self.diffusion_agent.parameters(), lr=lr)
               self.ema = ema
               
+              # learning rate schedule
+              self.scheduler = CosineAnnealingLR(self.optimizer, num_steps)
+              
               # logger
               self.logger = logger
               self.device = device
@@ -47,10 +51,13 @@ class DiffusionBCTrainer:
               # evaluator
               self.evaluator = evaluator
               
-       def train_epoch(self, epochs: int):
+              self.num_steps = num_steps
+              
+       def train_epoch(self):
               """
               train some epochs
               """
+              epochs = self.num_steps
               self.diffusion_agent.train()
               self.evaluator.eval_episodes(self.diffusion_agent, 0)
               for epoch in range(0, epochs):
@@ -68,7 +75,9 @@ class DiffusionBCTrainer:
                                    pbar.set_description(f"Epoch {epoch} Loss: {loss.item():.4f}")
                                    epoch_loss += loss.item()
                                    self.ema_update()
-                                   
+                            
+                            self.scheduler.step()
+                            
                      avg_loss = epoch_loss / len(self.train_dataloader)
                      self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
                      print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
@@ -79,10 +88,11 @@ class DiffusionBCTrainer:
               
               self.logger.finish()
                      
-       def train_steps(self, steps: int):
+       def train_steps(self):
               """
               train some steps
               """
+              steps = self.num_steps
               self.diffusion_agent.train()
               self.evaluator.eval_episodes(self.target_diffusion_agent, 0)
               
@@ -104,8 +114,10 @@ class DiffusionBCTrainer:
                      loss.backward()
                      self.optimizer.step()
                      self.ema_update()
+                     self.scheduler.step()
                      
-                     self.logger.log_metrics({"train/loss": loss.item()}, step=step)
+                     self.logger.log_metrics({"train/loss": loss.item(),
+                                              "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
                      
                      if (step + 1) % self.evaluator.eval_freq == 0:
                             rewards = self.evaluator.eval_episodes(self.target_diffusion_agent, step)
