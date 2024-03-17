@@ -6,30 +6,46 @@ AC_FN ={'relu': F.relu,
         'mish': F.mish}
 
 class MLP(nn.Module):
-       def __init__(self, input_size:int, hidden_sizes:list, output_size:int, ac_fn='relu', use_layernorm=False):
+       def __init__(
+              self, 
+              input_size:int, 
+              hidden_sizes:list, 
+              output_size:int, 
+              ac_fn: str='relu', 
+              use_layernorm: bool=False, 
+              dropout_rate: float=0.
+       ):
               super(MLP, self).__init__()
               self.use_layernorm = use_layernorm
+              self.dropout_rate = dropout_rate
               
               # initialize layers
               self.layers = nn.ModuleList()
               self.layernorms = nn.ModuleList() if use_layernorm else None
               self.ac_fn = AC_FN[ac_fn]
+              if self.dropout_rate > 0:
+                     self.dropout = nn.Dropout(self.dropout_rate)
               
               self.layers.append(nn.Linear(input_size, hidden_sizes[0]))
               for i in range(1, len(hidden_sizes)):
                      self.layers.append(nn.Linear(hidden_sizes[i-1], hidden_sizes[i]))
                      
               if self.use_layernorm:
-                     self.layernorms.append(nn.LayerNorm(hidden_sizes[i]))
+                     self.layernorms.append(nn.LayerNorm(input_size))
                      
               self.layers.append(nn.Linear(hidden_sizes[-1], output_size))
 
               
        def forward(self, x):
-              for layer in self.layers[:-1]:
-                     x = self.ac_fn(layer(x))
               if self.use_layernorm:
                      x = self.layernorms[-1](x)
+              
+              for layer in self.layers[:-1]:
+                     x = layer(x)
+                     if self.dropout_rate > 0:
+                            x = self.dropout(x)
+                     x = self.ac_fn(x)
+
               x = self.layers[-1](x)
               return x
        
