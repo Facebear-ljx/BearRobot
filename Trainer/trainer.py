@@ -15,6 +15,9 @@ from torch.utils.data import DataLoader
 
 OPTIMIZER = {"adam": torch.optim.Adam}
 
+LR_SCHEDULE = {"cosine": torch.optim.lr_scheduler.CosineAnnealingLR}
+
+
 class DiffusionBCTrainer:
        def __init__(
               self,
@@ -42,7 +45,7 @@ class DiffusionBCTrainer:
               self.ema = ema
               
               # learning rate schedule
-              self.scheduler = CosineAnnealingLR(self.optimizer, num_steps)
+              self.scheduler = LR_SCHEDULE['cosine'](self.optimizer, num_steps)
               
               # logger
               self.logger = logger

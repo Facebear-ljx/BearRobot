@@ -11,7 +11,7 @@ from Net.basic_net.mlp import MLP, MLPResNet
 
 # sinusoidal positional embeds
 class SinusoidalPosEmb(nn.Module):
-       def __init__(self, output_size):
+       def __init__(self, input_size, output_size):
               super().__init__()
               self.output_size = output_size
               
@@ -24,7 +24,22 @@ class SinusoidalPosEmb(nn.Module):
               f = torch.cat([f.cos(), f.sin()], axis=-1)
               return f
 
-TIMEEMBED = {"fixed": SinusoidalPosEmb}
+# learned positional embeds
+class LearnedPosEmb(nn.Module):
+       def __init__(self, input_size, output_size):
+              super().__init__()
+              self.output_size = output_size
+              self.kernel = nn.Parameter(torch.randn(output_size // 2, input_size) * 0.2)
+              
+       def forward(self, x):
+              f = 2 * torch.pi * x @ self.kernel.T
+              f = x * f
+              f = torch.cat([f.cos(), f.sin()], axis=-1)
+              return f       
+
+TIMEEMBED = {"fixed": SinusoidalPosEmb,
+             "learned": LearnedPosEmb}
+
 
 # the simplest mlp model that takes
 class MLPDiffusion(nn.Module):
@@ -49,7 +64,7 @@ class MLPDiffusion(nn.Module):
               # time embedding
               if time_embeding not in TIMEEMBED.keys():
                      raise ValueError(f"Invalid time_embedding '{time_embeding}'. Expected one of: {list(TIMEEMBED.keys())}")
-              self.time_process = TIMEEMBED[time_embeding](hidden_size)
+              self.time_process = TIMEEMBED[time_embeding](1, hidden_size)
               
               # decoder
               self.decoder = MLP(hidden_size+hidden_size, [hidden_size, hidden_size], output_dim)
@@ -94,7 +109,7 @@ class IDQLDiffusion(nn.Module):
               # time embedding
               if time_embeding not in TIMEEMBED.keys():
                      raise ValueError(f"Invalid time_embedding '{time_embeding}'. Expected one of: {list(TIMEEMBED.keys())}")
-              self.time_process = TIMEEMBED[time_embeding](time_dim)
+              self.time_process = TIMEEMBED[time_embeding](1, time_dim)
               self.time_encoder = MLP(time_dim, [128], 128, ac_fn='mish')
               
               # decoder
