@@ -71,7 +71,7 @@ class MLPResNetBlock(nn.Module):
               out = self.dense1(out)
               out = self.ac_fn(out)
               out = self.dense2(out)
-              out = identity + x
+              out = identity + out
               
               return out
 
