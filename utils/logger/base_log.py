@@ -1,6 +1,6 @@
 class BaseLogger():
-       def __init__(self, config):
-            self.config = config
+       def __init__(self, args):
+            self.args = args
        
        def log_metrics(self, metrics: dict, step: int):
               """
