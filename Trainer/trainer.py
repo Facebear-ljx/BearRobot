@@ -13,7 +13,8 @@ from Agent.base_agent import BaseAgent
 from torch.utils.data import DataLoader
 
 
-OPTIMIZER = {"adam": torch.optim.Adam}
+OPTIMIZER = {"adam": torch.optim.Adam,
+             "adamw": torch.optim.AdamW}
 
 LR_SCHEDULE = {"cosine": torch.optim.lr_scheduler.CosineAnnealingLR}
 
@@ -168,14 +169,14 @@ class RLTrainer:
               self.val_dataloader = val_dataloader
               
               # optimizer
-              self.policy_optimizer = OPTIMIZER[optimizer](self.agent.policy.parameters(), lr=lr)
+              self.policy_optimizer = OPTIMIZER['adamw'](self.agent.policy.parameters(), lr=lr)
               self.v_optimizer = OPTIMIZER[optimizer](self.agent.v_model.parameters(), lr=lr)
               self.q_optimizer = OPTIMIZER[optimizer](self.agent.q_models.parameters(), lr=lr)
               self.policy_ema = policy_ema
               self.critic_ema = critic_ema
               
               # learning rate schedule
-              self.scheduler = LR_SCHEDULE['cosine'](self.policy_optimizer, num_steps)
+              self.scheduler = LR_SCHEDULE['cosine'](self.policy_optimizer, num_steps * 2)
               
               # logger
               self.logger = logger

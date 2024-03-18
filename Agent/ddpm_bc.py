@@ -115,7 +115,7 @@ class DDPM_BC(BaseAgent):
               xt = self.q_sample(x0, t, noise)
               
               noise_pred = self.forward(xt, t, cond)
-              loss = F.mse_loss(noise_pred, noise)
+              loss = (((noise_pred - noise) ** 2).sum(axis = -1)).mean()
               
               return loss
               
@@ -187,7 +187,9 @@ class IDQL_Agent(BaseAgent):
               
 
        def q_loss(self, s, a, r, next_s, d):
-              target_q = r + self.gamma * d * self.v_model(next_s)
+              with torch.no_grad():
+                     target_q = r + self.gamma * d * self.v_model(next_s)
+              
               qs = self.q_models(s, a)
               
               loss = [F.mse_loss(q, target_q) for q in qs]
@@ -196,9 +198,10 @@ class IDQL_Agent(BaseAgent):
        
        
        def v_loss(self, s, a):
-              target_v = torch.cat(self.q_models_target(s, a), axis=1).min(axis=1)[0]
-              v = self.v_model(s)
+              with torch.no_grad():
+                     target_v = torch.cat(self.q_models_target(s, a), axis=1).min(axis=1, keepdim=True)[0]
               
+              v = self.v_model(s)
               loss = self.expectile_loss(target_v - v)
               return loss, v.mean()
        

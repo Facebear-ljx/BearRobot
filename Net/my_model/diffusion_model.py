@@ -33,7 +33,6 @@ class LearnedPosEmb(nn.Module):
               
        def forward(self, x):
               f = 2 * torch.pi * x @ self.kernel.T
-              f = x * f
               f = torch.cat([f.cos(), f.sin()], axis=-1)
               return f       
 
