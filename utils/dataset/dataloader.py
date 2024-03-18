@@ -74,16 +74,33 @@ OPENXDATASETS = [
 ]
 
 
+def return_range(dataset, max_episode_steps):
+       returns, lengths = [], []
+       ep_ret, ep_len = 0., 0
+       for r, d in zip(dataset['rewards'], dataset['terminals']):
+              ep_ret += float(r)
+              ep_len += 1
+              if d or ep_len == max_episode_steps:
+                     returns.append(ep_ret)
+                     lengths.append(ep_len)
+                     ep_ret, ep_len = 0., 0
+       # returns.append(ep_ret)    # incomplete trajectory
+       lengths.append(ep_len)      # but still keep track of number of steps
+       assert sum(lengths) == len(dataset['rewards'])
+       return min(returns), max(returns)
+
+
 class D4RLDataset(Dataset):
        def __init__(
               self,
               env_name,
               norm_dict = {"norm_s": False,
                            "norm_a": False,
-                           "norm_r": False},
+                           "norm_r": True},
        ):
               super().__init__()
               
+              self.env_name = env_name
               env = gym.make(env_name)
               self.dataset = d4rl.qlearning_dataset(env, terminate_on_end=True)  # dict with np.array
               self._normalize_dataset(**norm_dict)
@@ -107,27 +124,26 @@ class D4RLDataset(Dataset):
               else:
                      a_mean = np.zeros_like(self.dataset['actions'].mean(axis=0, keepdims=True))
                      a_std = np.ones_like(self.dataset['actions'].std(axis=0, keepdims=True))
-                     
-              if norm_r:
-                     r_mean = self.dataset['rewards'].mean()
-                     r_std = self.dataset['rewards'].std()
+              
+              if any(s in self.env_name for s in ('halfcheetah', 'hopper', 'walker2d')):
+                     if norm_r:
+                            r_min, r_max = return_range(self.dataset, 1000)
+                            self.dataset['rewards'] = self.dataset['rewards'] / (r_max - r_min) * 1000
+              elif 'antmaze' in self.env_name:
+                     self.dataset['rewards'] -= 1.
               else:
-                     r_mean = np.zeros_like(self.dataset['rewards'].mean())
-                     r_std = np.ones_like(self.dataset['rewards'].std())
+                     raise NotImplementedError
                      
               self.dataset['observations'] = (self.dataset['observations'] - s_mean) / (s_std + EPS)
               self.dataset['next_observations'] = (self.dataset['next_observations'] - s_mean) / (s_std + EPS)
               self.dataset['actions'] = (self.dataset['actions'] - a_mean) / (a_std + EPS)
-              self.dataset['rewards'] = (self.dataset['rewards'] - r_mean) / (r_std + EPS)
               
               self.data_statistics = {
                      "dataset_num" : self.dataset['observations'].shape[0],
                      "s_mean" : s_mean,
                      "s_std" : s_std,
                      "a_mean" : a_mean,
-                     "a_std" : a_std,
-                     "r_mean" : r_mean,
-                     "r_std" : r_std,              
+                     "a_std" : a_std,            
               }
               
                      
