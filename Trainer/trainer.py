@@ -230,11 +230,12 @@ class RLTrainer:
                      self.ema_update_q()
                      
                      # log the training process
-                     self.logger.log_metrics({"train/policy_loss": p_loss.item(),
-                                              "train/v_loss": v_loss.item(),
-                                              "train/q_loss": q_loss.item(),
-                                              "train/v_mean": v_mean.item(),
-                                              "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
+                     if (step + 1) % self.logger.record_freq == 0:
+                            self.logger.log_metrics({"train/policy_loss": p_loss.item(),
+                                                 "train/v_loss": v_loss.item(),
+                                                 "train/q_loss": q_loss.item(),
+                                                 "train/v_mean": v_mean.item(),
+                                                 "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
                      
                      # evaluate
                      if (step + 1) % self.evaluator.eval_freq == 0:
