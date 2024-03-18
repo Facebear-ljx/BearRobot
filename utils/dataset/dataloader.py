@@ -93,16 +93,38 @@ def return_range(dataset, max_episode_steps):
 class D4RLDataset(Dataset):
        def __init__(
               self,
-              env_name,
-              norm_dict = {"norm_s": False,
-                           "norm_a": False,
-                           "norm_r": True},
+              env_name: str,
+              norm_dict: dict={"norm_s": False,
+                               "norm_a": False,
+                               "norm_r": True},
+              clip_to_eps: bool=True, 
        ):
               super().__init__()
               
               self.env_name = env_name
               env = gym.make(env_name)
-              self.dataset = d4rl.qlearning_dataset(env, terminate_on_end=True)  # dict with np.array
+              self.dataset = d4rl.qlearning_dataset(env)  # dict with np.array
+              self.data_statistics = {"dataset_num" : self.dataset['observations'].shape[0]}
+              
+              if clip_to_eps:
+                     lim = 1 - EPS
+                     self.dataset["actions"] = np.clip(self.dataset["actions"], -lim, lim)
+              
+              dones = np.full_like(self.dataset["rewards"], False, dtype=bool)
+              for i in range(len(dones) - 1):
+                     if (
+                            np.linalg.norm(
+                            self.dataset["observations"][i + 1]
+                            - self.dataset["next_observations"][i]
+                            )
+                            > 1e-6
+                            or self.dataset["terminals"][i] == 1.0
+                     ):
+                            dones[i] = True
+
+              dones[-1] = True
+              self.dataset["dones"] = dones
+              
               self._normalize_dataset(**norm_dict)
               self._tran2tensor()
               
@@ -127,8 +149,9 @@ class D4RLDataset(Dataset):
               
               if any(s in self.env_name for s in ('halfcheetah', 'hopper', 'walker2d')):
                      if norm_r:
-                            r_min, r_max = return_range(self.dataset, 1000)
-                            self.dataset['rewards'] = self.dataset['rewards'] / (r_max - r_min) * 1000
+                            (_, _, episode_returns) = self._trajectory_boundaries_and_returns()
+                            self.dataset["rewards"] /= (np.max(episode_returns) - np.min(episode_returns))
+                            self.dataset['rewards'] *= 1000
               elif 'antmaze' in self.env_name:
                      self.dataset['rewards'] -= 1.
               else:
@@ -145,7 +168,25 @@ class D4RLDataset(Dataset):
                      "a_mean" : a_mean,
                      "a_std" : a_std,            
               }
-              
+
+       def _trajectory_boundaries_and_returns(self):
+              episode_starts = [0]
+              episode_ends = []
+
+              episode_return = 0
+              episode_returns = []
+
+              for i in range(len(self)):
+                     episode_return += self.dataset["rewards"][i]
+
+                     if self.dataset["dones"][i]:
+                            episode_returns.append(episode_return)
+                            episode_ends.append(i + 1)
+                            if i + 1 < len(self):
+                                   episode_starts.append(i + 1)
+                                   episode_return = 0.0
+
+              return episode_starts, episode_ends, episode_returns
                      
        def _tran2tensor(self):
               for key in ['observations', 'actions', 'rewards', 'next_observations', 'terminals']:
