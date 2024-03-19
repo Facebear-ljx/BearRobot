@@ -192,8 +192,8 @@ class RLTrainer:
               train some steps
               """
               steps = self.num_steps
-              self.agent.eval()
-              self.evaluator.eval_episodes(self.agent, 0)
+              # self.agent.eval()
+              # self.evaluator.eval_episodes(self.agent, 0)
               self.agent.train()
               
               iterator = iter(self.train_dataloader)

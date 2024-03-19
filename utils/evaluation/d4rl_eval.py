@@ -18,6 +18,7 @@ class D4RLEval(BaseEval):
               logger: BaseLogger,
               num_episodes: int=10,
               eval_freq: int=10,
+              seed: int=42,
        ):
               super(BaseEval, self).__init__()   
               self.env_name = env_name
@@ -27,6 +28,9 @@ class D4RLEval(BaseEval):
               self.num_episodes = num_episodes
               self.eval_freq = eval_freq
               self.logger = logger
+              
+              self.env.seed(seed)
+              self.env.action_space.seed(seed)
        
        def _log_results(self, metrics: dict, steps: int):
               if self.logger is None:

@@ -166,16 +166,19 @@ class DDPM_BC(BaseAgent):
 class IDQL_Agent(BaseAgent):
        def __init__(
               self, 
-              policy: BaseAgent,
+              policy_model: torch.nn.Module,
               v_model: torch.nn.Module, 
               q_models: torch.nn.Module,
+              schedule: str='vp', 
+              num_timesteps: int=5,
               num_sample: int=64,
               gamma: float=0.99,
               expectile: float=0.7,
        ):       
               super(BaseAgent, self).__init__()
-              self.policy = policy
-              self.policy_target = copy.deepcopy(policy)
+              ddpm_policy = DDPM_BC(policy_model, schedule=schedule, num_timesteps=num_timesteps)
+              self.policy = ddpm_policy
+              self.policy_target = copy.deepcopy(ddpm_policy)
               self.v_model = v_model
               self.q_models = q_models
               self.q_models_target = copy.deepcopy(q_models)

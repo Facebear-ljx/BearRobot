@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from torch.utils.data import DataLoader
 
 from Net.my_model.diffusion_model import MLPDiffusion, IDQLDiffusion
@@ -24,6 +25,7 @@ def main():
        parser.add_argument('--env_name', default='hopper-medium-expert-v2', help='choose your mujoco env')
        parser.add_argument('--steps', default=1.5e+6, type=float, help='train steps')
        parser.add_argument("--seed", default=42, type=int)  # Sets Gym, PyTorch and Numpy seeds
+       parser.add_argument("--expectile", default=0.7, type=float, help="expectile value in IQL")
        parser.add_argument('--batch_size', default=2048, type=int)
        parser.add_argument('--num_samples', default=64, type=int, help='evaluation sample action nums')
        parser.add_argument('--lr', default=3e-4, type=float, help='learning rate')
@@ -33,6 +35,11 @@ def main():
        
        args = parser.parse_args()
 
+       # seed
+       seed = args.seed
+       np.random.seed(seed)
+       torch.manual_seed(seed)
+       
        # dataset and dataloader
        env_name = args.env_name
        d4rl_dataset = D4RLDataset(env_name)
@@ -40,21 +47,18 @@ def main():
 
        # agent and the model for agent
        ## ddpm policy
-       model = IDQLDiffusion(d4rl_dataset.a_dim, d4rl_dataset.a_dim, d4rl_dataset.s_dim, time_embeding=args.time_embed, device=device).to(device)
-       ddpm_policy = DDPM_BC(model, schedule=args.beta, num_timesteps=args.T)
-       
-       ## v and q
+       policy_model = IDQLDiffusion(d4rl_dataset.a_dim, d4rl_dataset.a_dim, d4rl_dataset.s_dim, time_embeding=args.time_embed, device=device).to(device)
        v_model = MLPV(d4rl_dataset.s_dim, 1)
        qs_model = MLPQs(d4rl_dataset.s_dim + d4rl_dataset.a_dim, 1, ensemble_num=2)
        
        ## feed v, q and policy into IDQL agent
-       idql_agent = IDQL_Agent(ddpm_policy, v_model, qs_model, num_sample=args.num_samples).to(device)
-
+       idql_agent = IDQL_Agent(policy_model, v_model, qs_model, schedule=args.beta, num_timesteps=args.T, num_sample=args.num_samples, expectile=args.expectile).to(device)
+       
        # logger
        wandb_logger = WandbLogger(project_name=args.project_name, run_name=env_name, args=args)
 
        # evaluator
-       evaluator = D4RLEval(env_name, d4rl_dataset.data_statistics, wandb_logger, 50, 250000)
+       evaluator = D4RLEval(env_name, d4rl_dataset.data_statistics, wandb_logger, 50, 250000, seed=seed)
 
        # trainer
        test_trainer = RLTrainer(idql_agent, d4rl_dataloader, d4rl_dataloader, wandb_logger, evaluator, int(args.steps), lr=args.lr, device=device)
