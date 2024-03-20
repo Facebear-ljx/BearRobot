@@ -9,7 +9,8 @@ import numpy as np
 
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms as T
+import torch.nn.functional as F
+from torchvision import transforms
 
 import d4rl
 import gym
@@ -210,7 +211,6 @@ class AIROpenXDataset(Dataset):
               base_dir='/data/openxdata_npy',
               datalist='/data/openxdata_npy/datalist.json',
               dataset_name='bridge',
-              transform=T.ToTensor(),
        ):
               self.base_dir = base_dir
               self.dataset_name = dataset_name
@@ -218,7 +218,7 @@ class AIROpenXDataset(Dataset):
               self.datalist = json.load(open(datalist, "r"))
               self.dataset_weights = self._prepare_sampling_weights()
               
-              self.transform = transform
+              self.transform = transforms.ToTensor()
        
        def _prepare_indexes(self):
               """
@@ -284,3 +284,82 @@ class AIROpenXDataset(Dataset):
               if self.transform:
                      image = self.transform(image)
               return image
+       
+
+
+class RT1Dataset(AIROpenXDataset):
+       def __init__(
+              self,
+              base_dir: str='/data/openxdata_npy',
+              datalist: str='/data/openxdata_npy/datalist.json',
+              dataset_name: str='bridge',
+              img_size: int=128,
+              frames: int=1,
+              view_list: list[str]=['image0'],
+       ):
+              super().__init__(base_dir,
+                               datalist,
+                               dataset_name)
+              self.img_size = img_size
+              self.frames = frames
+              self.view_list = view_list
+              
+              transform = [
+                     transforms.Resize(256, interpolation=Image.BICUBIC),
+                     transforms.CenterCrop(img_size),
+                     transforms.ToTensor()
+              ]
+              self.transform = transforms.Compose(transform)
+              
+              self.action_keys = ["world_vector", "rotation_delta", "open_gripper"]
+       
+       
+       def discretize(self, tensor, num_bins, min_val, max_val):
+              normalized_tensor = (tensor - min_val) / (max_val - min_val)
+              discretized_tensor = torch.floor(normalized_tensor * num_bins).clamp(0, num_bins - 1)
+              discretized_tensor = discretized_tensor
+              return discretized_tensor
+       
+       def __getitem__(self, idx):
+              dataset_idx = random.choices(range(len(self.dataset_weights)), weights=self.dataset_weights, k=1)[0]
+              dataset_idx = 1 # TODO, comment this line when full data is available
+              episode_idx = random.randint(0, self.datalist[dataset_idx]['all_num'] - 1)
+              step_idx = random.randint(0, self.datalist[dataset_idx]['data'][episode_idx]['image_length'] - 1 - self.frames)
+              
+              dataset_name = self.datalist[dataset_idx]['dataset_name']
+              version = self._openxdataversion(dataset_name)
+              
+              episode_id = self.datalist[dataset_idx]['data'][episode_idx]['id']
+              
+              # images
+              frame_list = []
+              for _ in range(self.frames):
+                     view_list = []
+                     for view in self.view_list:
+                     # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
+                            image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{step_idx}.jpg'
+                            image = Image.open(image_path)
+                            if self.transform:
+                                   image = self.transform(image)
+                            view_list.append(image) # TODO warning, this operation may bring different sequences for different views
+                     frame_list.append(view_list)
+                     step_idx += 1
+              images = torch.stack([torch.stack([view.reshape(3, self.img_size, self.img_size) for view in view_list]) for view_list in frame_list])
+              
+              # actions
+              action_lang_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/action.json'
+              with open(f'{action_lang_path}', 'r') as f:
+                     step_info = json.load(f)
+              
+              ## discretize the action label
+              action = step_info[step_idx]['action']
+              action = torch.cat([torch.tensor(action[key], dtype=torch.float32).view(-1) for key in self.action_keys])
+              action[:6] = self.discretize(action[:6], 256, -1., 1.)
+              action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)  # TODO check here
+              
+              # language instruction
+              lang = step_info[0]['lang']
+              
+              return {"imgs": images,
+                      "a": action,
+                      "lang": lang}
