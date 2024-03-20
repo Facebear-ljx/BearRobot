@@ -2,8 +2,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from typing import Callable, Optional, Union, Tuple, List
+
+
 AC_FN ={'relu': F.relu,
-        'mish': F.mish}
+        'mish': F.mish,
+        'gelu': F.gelu}
+
 
 class MLP(nn.Module):
        def __init__(
@@ -15,7 +20,7 @@ class MLP(nn.Module):
               use_layernorm: bool=False, 
               dropout_rate: float=0.
        ):
-              super(MLP, self).__init__()
+              super().__init__()             
               self.use_layernorm = use_layernorm
               self.dropout_rate = dropout_rate
               
