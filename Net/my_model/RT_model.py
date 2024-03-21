@@ -131,7 +131,7 @@ class RT1Model(nn.Module):
               
               print("-"*88)
               assert text_encoder == 't5'
-              self.lang_encoder = T5Encoder()
+              self.lang_encoder = T5Encoder(device=device)
               condition_dim = 768
               self.condition_dim = condition_dim * condition_dim_mult
               print("lang encoder load success")
@@ -198,14 +198,16 @@ class RT1Model(nn.Module):
               B, F, V, C, H, W = images.shape
               B, D = condition.shape
               
-              image_feature = images.view(B * F * V, C, H, W)
+              # text condition projection
               condition = self.visual_condition_projector(condition)
               condition = condition.unsqueeze(1).repeat(1, F*V, 1).view(B*F*V, self.condition_dim)
               
+              # image projection
+              image_feature = images.view(B * F * V, C, H, W)
               image_feature = self.visual_encoder.stem(image_feature)
               
+              # Film
               visual_blocks = [block for stage in self.visual_encoder.stages for block in stage.blocks]
-              
               for visual_block, condition_block in zip(visual_blocks, self.visual_conditioner):
                      image_feature = condition_block(condition, image_feature)
                      image_feature = visual_block(image_feature)

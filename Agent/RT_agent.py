@@ -14,11 +14,11 @@ from Net.my_model.RT_model import RT1Model
 class RT1Agent(BaseAgent):
        def __init__(
               self, 
-              model: RT1Model, 
+              policy: RT1Model, 
        ):
               super(BaseAgent, self).__init__()
-              self.model = model
-              self.img_size = self.model.img_size
+              self.policy = policy
+              self.img_size = self.policy.img_size
               
               transform = [
                      transforms.Resize(256, interpolation=Image.BICUBIC),
@@ -27,7 +27,7 @@ class RT1Agent(BaseAgent):
               ]
               self.transform = transforms.Compose(transform)
               
-              self.device = self.model.device
+              self.device = self.policy.device
 
        def forward(self, images: torch.Tensor, texts: list[str], state=None):
               """
@@ -36,7 +36,7 @@ class RT1Agent(BaseAgent):
               # texts: list of instructions
               # state shape [B, D] robot arm x,y,z, gripper state, et al
               """                    
-              logits = self.model(images, texts, state)
+              logits = self.policy(images, texts, state)
               return logits
        
        def policy_loss(self, images: torch.Tensor, texts: list[str], action_gt: torch.Tensor, state=None):

@@ -1,2 +1,8 @@
 *.pyc
 wandb/
+data_check.py
+data_process.py
+datalist.json
+test.ipynb
+*.json
+jinliang_ref/

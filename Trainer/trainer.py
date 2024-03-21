@@ -19,10 +19,10 @@ OPTIMIZER = {"adam": torch.optim.Adam,
 LR_SCHEDULE = {"cosine": torch.optim.lr_scheduler.CosineAnnealingLR}
 
 
-class DiffusionBCTrainer:
+class BCTrainer:
        def __init__(
               self,
-              diffusion_agent: BaseAgent,
+              agent: BaseAgent,
               train_dataloader: DataLoader,
               val_dataloader: DataLoader,
               logger: BaseLogger,
@@ -34,15 +34,15 @@ class DiffusionBCTrainer:
               device: str='cpu',
        ):
               # model
-              self.diffusion_agent = diffusion_agent
-              self.target_diffusion_agent = copy.deepcopy(self.diffusion_agent)
+              self.agent = agent
+              self.target_agent = copy.deepcopy(self.agent)
               
               # dataloader
               self.train_dataloader = train_dataloader
               self.val_dataloader = val_dataloader
               
               # optimizer
-              self.optimizer = OPTIMIZER[optimizer](self.diffusion_agent.parameters(), lr=lr)
+              self.optimizer = OPTIMIZER[optimizer](self.agent.parameters(), lr=lr)
               self.ema = ema
               
               # learning rate schedule
@@ -62,23 +62,24 @@ class DiffusionBCTrainer:
               train some epochs
               """
               epochs = self.num_steps
-              self.diffusion_agent.train()
-              self.evaluator.eval_episodes(self.diffusion_agent, 0)
+              self.agent.train()
               for epoch in range(0, epochs):
                      epoch_loss = 0.
                      with tqdm(self.train_dataloader, unit="batch") as pbar:
                             for batch in pbar:
-                                   cond = batch['s'].to(self.device)
-                                   x = batch['a'].to(self.device)
+                                   imgs = batch['imgs'].to(self.device)
+                                   a = batch['a'].to(self.device)
+                                   lang = batch['lang']
                                    
                                    self.optimizer.zero_grad()
-                                   loss = self.diffusion_agent.loss(x, cond)
+                                   loss = self.agent.policy_loss(imgs, lang, a)
                                    loss.backward()
                                    self.optimizer.step()
                                    
                                    pbar.set_description(f"Epoch {epoch} Loss: {loss.item():.4f}")
                                    epoch_loss += loss.item()
-                                   self.ema_update()
+                                   if self.ema is not None:
+                                          self.ema_update()
                             
                             self.scheduler.step()
                             
@@ -97,53 +98,55 @@ class DiffusionBCTrainer:
               train some steps
               """
               steps = self.num_steps
-              self.diffusion_agent.train()
-              self.evaluator.eval_episodes(self.target_diffusion_agent, 0)
+              self.agent.train()
               
               iterator = iter(self.train_dataloader)
               for step in tqdm(range(steps)):
                      # with tqdm(self.train_dataloader, unit="batch") as pbar:
                      try:
                             batch = next(iterator)
-                            
                      except:
                             iterator = iter(self.train_dataloader)
                             batch = next(iterator)
                             
-                     cond = batch['s'].to(self.device)
-                     x = batch['a'].to(self.device)
+                     imgs = batch['imgs'].to(self.device)
+                     a = batch['a'].to(self.device)
+                     lang = batch['lang']
                      
                      self.optimizer.zero_grad()
-                     loss = self.diffusion_agent.policy_loss(x, cond)
+                     loss = self.agent.policy_loss(imgs, lang, a)
                      loss.backward()
                      self.optimizer.step()
-                     self.ema_update()
+                     if self.ema is not None:
+                            self.ema_update()
                      self.scheduler.step()
                      
                      self.logger.log_metrics({"train/policy_loss": loss.item(),
                                               "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
                      
-                     if (step + 1) % self.evaluator.eval_freq == 0:
-                            rewards = self.evaluator.eval_episodes(self.target_diffusion_agent, step)
-                            print(f"Epoch {step} Average return: {rewards:.4f}")
+                     # if (step + 1) % self.evaluator.eval_freq == 0:
+                            # rewards = self.evaluator.eval_episodes(self.agent, step)
+                            # print(f"Epoch {step} Average return: {rewards:.4f}")
+                            # print(f"Evaluation needs ")
+                            # pass
               
               self.logger.finish()
        
        def ema_update(self):
-              for param, target_param in zip(self.diffusion_agent.parameters(), self.target_diffusion_agent.parameters()):
+              for param, target_param in zip(self.agent.parameters(), self.target_agent.parameters()):
                      target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
               
        def save_model(self, path: str):
               """
               save the model to path
               """
-              torch.save(self.diffusion_agent.state_dict(), path)
+              torch.save(self.agent.state_dict(), path)
               
        def load_model(self, path: str):
               """
               load ckpt from path
               """
-              self.diffusion_agent.load_state_dict(torch.load(path, map_location=self.device))
+              self.agent.load_state_dict(torch.load(path, map_location=self.device))
               
               
 class RLTrainer:
