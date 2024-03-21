@@ -79,14 +79,15 @@ SCHEDULE = {'linear': linear_beta_schedule,
 class DDPM_BC(BaseAgent):
        def __init__(
               self, 
-              model: torch.nn.Module, 
+              policy: torch.nn.Module, 
               schedule: str='cosine',
               num_timesteps: int=5,
        ):
-              super(BaseAgent, self).__init__()
-              self.model = model
+              super().__init__(
+                     policy, None, None
+              )
               
-              self.device = model.device
+              self.device = policy.device
               if schedule not in SCHEDULE.keys():
                      raise ValueError(f"Invalid schedule '{schedule}'. Expected one of: {list(SCHEDULE.keys())}")
               self.schedule = SCHEDULE[schedule]
@@ -100,7 +101,7 @@ class DDPM_BC(BaseAgent):
               """
               predict the noise
               """
-              noise_pred = self.model(xt, t, cond)
+              noise_pred = self.policy(xt, t, cond)
               return noise_pred
        
        def policy_loss(self, x0, cond=None):
@@ -160,7 +161,7 @@ class DDPM_BC(BaseAgent):
 
        @torch.no_grad()
        def get_action(self, state, num=1):
-              return self.ddpm_sampler((num, self.model.output_dim), cond=state)
+              return self.ddpm_sampler((num, self.policy.output_dim), cond=state)
        
 
 class IDQL_Agent(BaseAgent):
@@ -175,15 +176,16 @@ class IDQL_Agent(BaseAgent):
               gamma: float=0.99,
               expectile: float=0.7,
        ):       
-              super(BaseAgent, self).__init__()
+              super().__init__(
+                     None,
+                     v_model,
+                     q_models,
+                     gamma=gamma
+              )
               ddpm_policy = DDPM_BC(policy_model, schedule=schedule, num_timesteps=num_timesteps)
               self.policy = ddpm_policy
               self.policy_target = copy.deepcopy(ddpm_policy)
-              self.v_model = v_model
-              self.q_models = q_models
-              self.q_models_target = copy.deepcopy(q_models)
               
-              self.gamma = gamma
               self.expectile = expectile
               self.num_sample = num_sample
               self.device = self.policy.device

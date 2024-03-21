@@ -16,8 +16,11 @@ class RT1Agent(BaseAgent):
               self, 
               policy: RT1Model, 
        ):
-              super(BaseAgent, self).__init__()
-              self.policy = policy
+              super().__init__(
+                     policy,
+                     None,
+                     None
+              )
               self.img_size = self.policy.img_size
               
               transform = [

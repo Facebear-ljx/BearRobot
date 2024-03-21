@@ -35,14 +35,13 @@ class BCTrainer:
        ):
               # model
               self.agent = agent
-              self.target_agent = copy.deepcopy(self.agent)
               
               # dataloader
               self.train_dataloader = train_dataloader
               self.val_dataloader = val_dataloader
               
               # optimizer
-              self.optimizer = OPTIMIZER[optimizer](self.agent.parameters(), lr=lr)
+              self.optimizer = OPTIMIZER[optimizer](self.agent.policy.parameters(), lr=lr)
               self.ema = ema
               
               # learning rate schedule
@@ -133,7 +132,7 @@ class BCTrainer:
               self.logger.finish()
        
        def ema_update(self):
-              for param, target_param in zip(self.agent.parameters(), self.target_agent.parameters()):
+              for param, target_param in zip(self.agent.policy.parameters(), self.agent.policy_target.parameters()):
                      target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
               
        def save_model(self, path: str):
