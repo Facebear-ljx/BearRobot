@@ -177,7 +177,7 @@ class IDQL_Agent(BaseAgent):
               expectile: float=0.7,
        ):       
               super().__init__(
-                     None,
+                     policy_model,
                      v_model,
                      q_models,
                      gamma=gamma
