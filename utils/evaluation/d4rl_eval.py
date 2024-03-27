@@ -29,8 +29,8 @@ class D4RLEval(BaseEval):
               self.eval_freq = eval_freq
               self.logger = logger
               
-              self.env.seed(seed)
-              self.env.action_space.seed(seed)
+              self.env.seed(seed+100)
+              self.env.action_space.seed(seed+100)
        
        def _log_results(self, metrics: dict, steps: int):
               if self.logger is None:
@@ -48,12 +48,12 @@ class D4RLEval(BaseEval):
               state = self.env.reset()
               while True:
                      # norm state
-                     state = (state - self.data_statistics['s_mean']) / (self.data_statistics['s_std'] + EPS)
+                     state = (state - self.data_statistics['s_mean']) / (self.data_statistics['s_std'])
                      state = torch.from_numpy(state).to(policy.device).float()
                      
                      # get action and denorm
                      action = policy.get_action(state).cpu().detach().numpy()
-                     action = action * (self.data_statistics['a_std'] + EPS) + self.data_statistics['a_mean']
+                     action = action * (self.data_statistics['a_std']) + self.data_statistics['a_mean']
                      action = action.reshape(-1)
                      
                      # step

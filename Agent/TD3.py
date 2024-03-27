@@ -76,7 +76,7 @@ class TD3_Agent(BaseAgent):
                      state = torch.tensor(state, dtype=torch.float32).to(self.device)
               action = self.policy(state)
               
-              noise = (torch.randn_like(action) * self.policy_noise).clamp(-self.noise_clip, self.noise_clip)
+              noise = (torch.randn_like(action) * 0.1)
               action = (action + noise).clamp(-1., 1.)
               return action.cpu().detach().numpy()
               
