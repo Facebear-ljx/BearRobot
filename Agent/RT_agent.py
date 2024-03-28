@@ -32,7 +32,18 @@ class RT1Agent(BaseAgent):
               
               self.device = self.policy.device
 
-       def forward(self, images: torch.Tensor, texts: list[str], state=None):
+       def forward(self, images: torch.Tensor, texts: list[str], action_gt: torch.Tensor, state=None):
+              '''
+              calculate RT1 loss / cross entropy
+              # images: batch of frames of different views, [B, Frame, View, C, H, W]
+              # texts: list of instructions
+              # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
+              # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
+              '''
+              loss = self.policy_loss(images, texts, action_gt, state)
+              return loss
+
+       def logits(self, images: torch.Tensor, texts: list[str], state=None):
               """
               predict the loogits
               # images: batch of frames of different views, [B, Frame, View, C, H, W]
@@ -50,12 +61,12 @@ class RT1Agent(BaseAgent):
               # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
               # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
               '''
-              logits = self(images, texts, state)
+              logits = self.logits(images, texts, state)
               _, _, N = logits.shape  # [bs, a_dim, bins]
               logits = logits.view(-1, N)
               label = action_gt.view(-1).to(torch.int64)
               loss = F.cross_entropy(logits, label)
-              return loss
+              return loss              
        
        def q_loss(self):
               raise ValueError("RT1 agent is a BC agent, has no q value")
@@ -76,7 +87,7 @@ class RT1Agent(BaseAgent):
                      images = [torch.stack([torch.stack([self.transform(view).reshape(3, self.img_size, self.img_size) for view in frame_list]) for frame_list in one_images]).unsqueeze(0) for one_images in images]
                      images = torch.cat(images, dim=0)  # tensor [1, Frame, View, C, H, W]
               
-              logits = self(images, text, state).view(-1, 256)  # [7, 256]
+              logits = self.logits(images, text, state).view(-1, 256)  # [7, 256]
               joint = logits[:6].softmax(-1).max(-1).indices  # [6]
               joint = -1 + joint / 128  # decode to -1~1
               

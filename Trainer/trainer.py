@@ -5,6 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.optim.lr_scheduler import CosineAnnealingLR
 
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 from tqdm import tqdm
 
 from utils.evaluation.base_eval import BaseEval
@@ -31,17 +33,21 @@ class BCTrainer:
               lr: float=1e-4,
               ema: float=1e-3,
               optimizer: str='adam',
-              device: str='cpu',
-       ):
+              device: int=0,
+              args=None,
+              **kwargs,
+       ):     
+              torch.distributed.barrier()
               # model
-              self.agent = agent
+              self.agent_without_ddp = agent
+              self.agent = DDP(agent, device_ids=[device], find_unused_parameters=True)
               
               # dataloader
               self.train_dataloader = train_dataloader
               self.val_dataloader = val_dataloader
               
               # optimizer
-              self.optimizer = OPTIMIZER[optimizer](self.agent.policy.parameters(), lr=lr)
+              self.optimizer = OPTIMIZER[optimizer](self.agent.module.policy.parameters(), lr=lr)
               self.ema = ema
               
               # learning rate schedule
@@ -55,6 +61,7 @@ class BCTrainer:
               self.evaluator = evaluator
               
               self.num_steps = num_steps
+              torch.distributed.barrier()
               
        def train_epoch(self):
               """
@@ -64,6 +71,7 @@ class BCTrainer:
               self.agent.train()
               for epoch in range(0, epochs):
                      epoch_loss = 0.
+                     torch.cuda.synchronize()
                      with tqdm(self.train_dataloader, unit="batch") as pbar:
                             for batch in pbar:
                                    imgs = batch['imgs'].to(self.device)
@@ -71,9 +79,10 @@ class BCTrainer:
                                    lang = batch['lang']
                                    
                                    self.optimizer.zero_grad()
-                                   loss = self.agent.policy_loss(imgs, lang, a)
+                                   loss = self.agent(imgs, lang, a)
                                    loss.backward()
                                    self.optimizer.step()
+                                   torch.cuda.synchronize()
                                    
                                    pbar.set_description(f"Epoch {epoch} Loss: {loss.item():.4f}")
                                    epoch_loss += loss.item()
@@ -83,12 +92,13 @@ class BCTrainer:
                             self.scheduler.step()
                             
                      avg_loss = epoch_loss / len(self.train_dataloader)
-                     self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
-                     print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
+                     if self.device == 0:
+                            self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
+                            print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
                      
-                     if (epoch + 1) % self.evaluator.eval_freq == 0:
-                            rewards = self.evaluator.eval_episodes(self.target_diffusion_agent, epoch+1)
-                            print(f"Epoch {epoch} Average return: {rewards:.4f}")
+                     # if (epoch + 1) % self.evaluator.eval_freq == 0:
+                     #        rewards = self.evaluator.eval_episodes(self.target_diffusion_agent, epoch+1)
+                     #        print(f"Epoch {epoch} Average return: {rewards:.4f}")
               
               self.logger.finish()
                      
@@ -100,6 +110,7 @@ class BCTrainer:
               self.agent.train()
               
               iterator = iter(self.train_dataloader)
+              torch.cuda.synchronize()
               for step in tqdm(range(steps)):
                      # with tqdm(self.train_dataloader, unit="batch") as pbar:
                      try:
@@ -113,14 +124,17 @@ class BCTrainer:
                      lang = batch['lang']
                      
                      self.optimizer.zero_grad()
-                     loss = self.agent.policy_loss(imgs, lang, a)
+                     loss = self.agent(imgs, lang, a)
                      loss.backward()
                      self.optimizer.step()
+                     torch.cuda.synchronize()
+                     
                      if self.ema is not None:
                             self.ema_update()
                      self.scheduler.step()
                      
-                     self.logger.log_metrics({"train/policy_loss": loss.item(),
+                     if self.device == 0:
+                            self.logger.log_metrics({"train/policy_loss": loss.item(),
                                               "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
                      
                      # if (step + 1) % self.evaluator.eval_freq == 0:
@@ -132,7 +146,7 @@ class BCTrainer:
               self.logger.finish()
        
        def ema_update(self):
-              for param, target_param in zip(self.agent.policy.parameters(), self.agent.policy_target.parameters()):
+              for param, target_param in zip(self.agent.module.policy.parameters(), self.agent.module.policy_target.parameters()):
                      target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
               
        def save_model(self, path: str):

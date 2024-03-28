@@ -12,6 +12,9 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torchvision import transforms
 
+from utils import ddp
+from torch.utils.data import DistributedSampler
+
 import d4rl
 import gym
 
@@ -314,6 +317,9 @@ class RT1Dataset(AIROpenXDataset):
               self.action_keys = ["world_vector", "rotation_delta", "open_gripper"]
        
        
+       def __len__(self):
+              return 100000 * 128
+       
        def discretize(self, tensor, num_bins, min_val, max_val):
               normalized_tensor = (tensor - min_val) / (max_val - min_val)
               discretized_tensor = torch.floor(normalized_tensor * num_bins).clamp(0, num_bins - 1)
@@ -363,3 +369,39 @@ class RT1Dataset(AIROpenXDataset):
               return {"imgs": images,
                       "a": action,
                       "lang": lang}
+              
+
+def RT1DataLoader(
+       base_dir: str='/data/openxdata_npy',
+       datalist: str='/data/openxdata_npy/datalist.json',
+       dataset_name: str='bridge',
+       img_size: int=128,
+       frames: int=1,
+       view_list: list[str]=['image0'],
+       batch_size: int=64,
+       num_workers: int=8,
+       pin_mem: bool=True,
+):
+       rt1dataset = RT1Dataset(base_dir=base_dir,
+                               datalist=datalist,
+                               dataset_name=dataset_name,
+                               img_size=img_size,
+                               frames=frames,
+                               view_list=view_list)
+
+       num_tasks = ddp.get_world_size()
+       global_rank = ddp.get_rank()
+       sampler = DistributedSampler(
+            rt1dataset, num_replicas=num_tasks, rank=global_rank, shuffle=True
+       )
+       
+       rt1dataloader = DataLoader(
+              rt1dataset, 
+              sampler=sampler,
+              batch_size=batch_size // num_tasks, 
+              num_workers=num_workers,
+              pin_memory=pin_mem,
+              drop_last=True
+       )
+       
+       return rt1dataloader
