@@ -6,3 +6,4 @@ datalist.json
 test.ipynb
 *.json
 jinliang_ref/
+*.out

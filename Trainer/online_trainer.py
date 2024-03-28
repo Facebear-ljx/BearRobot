@@ -80,13 +80,13 @@ class RLTrainer:
                      else:
                             step_a = self.agent.explore_action(step_s)
                      step_next_s, step_r, step_d, _ = self.env.step(step_a)
-                     step_d = 1 - float(step_d) if ep_steps < 1000 else 1.
+                     d_bool = 1 - float(step_d) if ep_steps < 1000 else 1.
                      
                      # add data in replay buffer
-                     self.train_dataloader.add_data(step_s, step_a, step_r, step_next_s, step_d)
+                     self.train_dataloader.add_data(step_s, step_a, step_r, step_next_s, d_bool)
                      step_s = step_next_s
                      
-                     if step_d < 0.5:
+                     if step_d:
                             ep_steps = 0.
                             step_s, step_d = self.env.reset(), False
                      
