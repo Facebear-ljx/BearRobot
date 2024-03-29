@@ -164,6 +164,65 @@ class DDPM_BC(BaseAgent):
               return self.ddpm_sampler((num, self.policy.output_dim), cond=state)
        
 
+class DDPM_BC_latent(DDPM_BC):
+       """
+       this is a video prediction diffusion model in the latent space, based on DDPM
+       """
+       def __init__(
+              self, 
+              policy: torch.nn.Module, 
+              schedule: str='cosine',  
+              num_timesteps: int=5,
+              mmencoder: torch.nn.Module=None,            
+              *args, **kwargs) -> None:
+              super().__init__(policy, schedule, num_timesteps)
+              
+              self.mmencoder = mmencoder
+       
+
+       def forward(self, img: torch.Tensor, cond_img: torch.Tensor=None, cond_lang: list[str]=None):
+              """
+              img: torch.tensor, s_t+1, the predicted img
+              cond_img: torch.tensor, s_t, the current observed img
+              cond_lang: list[str], the language instruction
+              """
+              img, cond = self.encode(img, cond_img, cond_lang)
+              loss = self.policy_loss(img, cond)
+              return loss
+
+
+       def encode(self, img: torch.Tensor, cond_img: torch.Tensor=None, cond_lang: list[str]=None):
+              """
+              encode the img and language instruction into latent space
+              img: torch.tensor, s_t+1, the predicted img
+              cond_img: torch.tensor, s_t, the current observed img
+              cond_lang: list[str], the language instruction
+              """
+              with torch.no_grad():
+                     try:
+                            img = self.mmencoder.encode_image(img)
+                     except:
+                            img = None
+                     
+                     cond_img = self.mmencoder.encode_image(cond_img) if cond_img is not None else None
+                     cond_lang = self.mmencoder.encode_lang(cond_lang) if cond_lang is not None else None
+                     try:
+                            cond = torch.cat([cond_img, cond_lang], dim=-1)
+                     except:
+                            try:
+                                   cond = cond_img
+                            except:
+                                   cond = None
+              return img, cond 
+       
+       @torch.no_grad()
+       def get_action(self, cond_img: torch.Tensor, cond_lang: list[str], num=1):
+              _, cond = self.encode(None, cond_img, cond_lang)
+              return self.ddpm_sampler((num, self.policy.output_dim), cond=cond)
+              # TODO implement DDIM sampler to accelerate the sampling
+              
+              
+
 class IDQL_Agent(BaseAgent):
        def __init__(
               self, 
