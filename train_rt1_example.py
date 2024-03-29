@@ -26,10 +26,12 @@ def get_args():
        parser.add_argument('--img_size', default=128, type=int, help='image size')
        parser.add_argument('--frames', default=3, type=int, help='frames num input to RT1')
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
-       parser.add_argument('--steps', default=10000, type=float, help='train steps')
+       parser.add_argument('--steps', default=int(1e+6), type=float, help='train steps')
        parser.add_argument("--seed", default=42, type=int)  # Sets PyTorch and Numpy seeds
        parser.add_argument('--batch_size', default=128, type=int)
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
+       parser.add_argument('--save', default=True, type=boolean, help='save ckpt or not')
+       parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
 
        # DataLoader parameters
        parser.add_argument('--num_workers', default=8, type=int)
@@ -38,13 +40,14 @@ def get_args():
        parser.set_defaults(pin_mem=True)
        
        # distributed training parameters
-       parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
+       parser.add_argument('--world_size', default=3, type=int, help='number of distributed processes')
        parser.add_argument('--port', default=22323, type=int, help='port')
        args = parser.parse_args()    
        return args   
 
 
-def main(rank: int, world_size: int, args):
+def main(rank: int, world_size: int, save_path: str, args):
+       # wandb logger
        wandb_logger = WandbLogger(project_name=args.project_name, run_name=args.dataset_name, args=args, rank=rank) 
        
        # init ddp
@@ -63,7 +66,19 @@ def main(rank: int, world_size: int, args):
        rt1agent = RT1Agent(rt1model)      
 
        # trainer
-       test_trainer = BCTrainer(rt1agent, rt1dataloader, rt1dataloader, wandb_logger, None, num_steps=int(args.steps), lr=args.lr, device=rank, args=args)
+       test_trainer = BCTrainer(rt1agent, 
+                                rt1dataloader, 
+                                rt1dataloader, 
+                                wandb_logger, 
+                                None, 
+                                num_steps=int(args.steps), 
+                                lr=args.lr, 
+                                device=rank,
+                                save=args.save,
+                                save_freq=args.save_freq, 
+                                save_path=save_path,
+                                args=args
+                     )
        test_trainer.train_steps()
 
 
@@ -72,10 +87,25 @@ if __name__ == '__main__':
        args = get_args()
        device = torch.device(args.device)
        
+       # your ckpt save path
+       import os
+       from datetime import datetime
+
+       previous_dir = os.getcwd()
+       base_dir = "experiments"
+       project_name = args.project_name
+       data_name = args.dataset_name
+       time = datetime.now()
+       time = time.strftime("%Y-%m-%d %H:%M:%S")
+       save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
+       
+       if not os.path.exists(save_path):
+              os.makedirs(save_path)
+       
        # seed
        seed = args.seed + ddp.get_rank()
        np.random.seed(seed)
        torch.manual_seed(seed)
        random.seed(seed)
        
-       mp.spawn(main, args=(args.world_size, args), nprocs=args.world_size)
+       mp.spawn(main, args=(args.world_size, save_path, args), nprocs=args.world_size)

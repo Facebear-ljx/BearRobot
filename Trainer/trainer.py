@@ -34,6 +34,9 @@ class BCTrainer:
               ema: float=1e-3,
               optimizer: str='adam',
               device: int=0,
+              save: bool=True,
+              save_freq: int=10000,
+              save_path: str=None,
               args=None,
               **kwargs,
        ):     
@@ -59,6 +62,11 @@ class BCTrainer:
               
               # evaluator
               self.evaluator = evaluator
+              
+              # save
+              self.save = save
+              self.save_freq = save_freq
+              self.save_path = save_path
               
               self.num_steps = num_steps
               torch.distributed.barrier()
@@ -137,6 +145,11 @@ class BCTrainer:
                             self.logger.log_metrics({"train/policy_loss": loss.item(),
                                               "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
                      
+                     if self.save:
+                            if step % self.save_freq == 0:
+                                   if self.device == 0:
+                                          self.save_model(step, loss.item())
+                     
                      # if (step + 1) % self.evaluator.eval_freq == 0:
                             # rewards = self.evaluator.eval_episodes(self.agent, step)
                             # print(f"Epoch {step} Average return: {rewards:.4f}")
@@ -149,11 +162,11 @@ class BCTrainer:
               for param, target_param in zip(self.agent.module.policy.parameters(), self.agent.module.policy_target.parameters()):
                      target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
               
-       def save_model(self, path: str):
+       def save_model(self, step, loss):
               """
               save the model to path
               """
-              torch.save(self.agent.state_dict(), path)
+              torch.save(self.agent.module.state_dict(), f"{self.save_path}/{step}_{loss}.pth")
               
        def load_model(self, path: str):
               """
