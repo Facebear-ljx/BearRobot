@@ -32,6 +32,7 @@ def get_args():
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
        parser.add_argument('--save', default=True, type=boolean, help='save ckpt or not')
        parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
+       parser.add_argument('--resume', default="/home/lijx/ljx/robotics/bearobot/experiments/RT1_pytorch_example/bridge/2024-03-28 22:22:45/50000_1.4489701986312866.pth", type=str, help='resume path')
 
        # DataLoader parameters
        parser.add_argument('--num_workers', default=8, type=int)
@@ -77,6 +78,7 @@ def main(rank: int, world_size: int, save_path: str, args):
                                 save=args.save,
                                 save_freq=args.save_freq, 
                                 save_path=save_path,
+                                resume_path=args.resume,
                                 args=args
                      )
        test_trainer.train_steps()

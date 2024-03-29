@@ -37,6 +37,7 @@ class BCTrainer:
               save: bool=True,
               save_freq: int=10000,
               save_path: str=None,
+              resume_path: str=None,
               args=None,
               **kwargs,
        ):     
@@ -67,6 +68,13 @@ class BCTrainer:
               self.save = save
               self.save_freq = save_freq
               self.save_path = save_path
+              
+              # resume 
+              if resume_path is not None:
+                     self.load_model(resume_path)
+              else:
+                     self.init_step = 0
+                     print("train from scratch")
               
               self.num_steps = num_steps
               torch.distributed.barrier()
@@ -119,7 +127,7 @@ class BCTrainer:
               
               iterator = iter(self.train_dataloader)
               torch.cuda.synchronize()
-              for step in tqdm(range(steps)):
+              for step in tqdm(range(self.init_step, steps)):
                      # with tqdm(self.train_dataloader, unit="batch") as pbar:
                      try:
                             batch = next(iterator)
@@ -166,13 +174,49 @@ class BCTrainer:
               """
               save the model to path
               """
-              torch.save(self.agent.module.state_dict(), f"{self.save_path}/{step}_{loss}.pth")
+              save_model = {'model': self.agent.module.state_dict(), 
+                            'optimizer': self.optimizer.state_dict(), 
+                            'schedule': self.scheduler.state_dict(),
+                            'step': step}
+              torch.save(save_model, f"{self.save_path}/{step}_{loss}.pth")
               
        def load_model(self, path: str):
               """
               load ckpt from path
               """
-              self.agent.load_state_dict(torch.load(path, map_location=self.device))
+              print(f"loading ckpt from {path}")
+              ckpt = torch.load(path, map_location='cpu')
+              
+              # load model
+              try:
+                     self.agent.module.load_state_dict(ckpt['model'])
+                     self.agent = self.agent.to(self.device)
+              except:
+                     self.agent.module.load_state_dict(ckpt)
+                     self.agent = self.agent.to(self.device)                     
+              print("Model load done")
+              
+              # load optimizer
+              try:
+                     self.optimizer.load_state_dict(ckpt['optimizer'])
+                     print("Optimizer load done")
+              except:
+                     print("no pretrained optimizer found, init one")
+                     
+              # load schedule
+              try:
+                     self.scheduler.load_state_dict(ckpt['schedule'])
+                     print("Schedule load done")
+              except:
+                     print("no schedule found, init one")
+              
+              # load step
+              try:
+                     self.init_step = ckpt['step']
+                     print("Step load done")
+              except:
+                     self.init_step = 0
+              
               
               
 class RLTrainer:
