@@ -379,7 +379,7 @@ class RT1Dataset(AIROpenXDataset):
               lang = step_info[0]['lang']
               
               return {"imgs": images,
-                      "a": action,
+                      "label": action,
                       "lang": lang}
 
 
@@ -435,36 +435,30 @@ class VPDataset(AIROpenXDataset):
               dataset_name = self.datalist[dataset_idx]['dataset_name']
               version = self._openxdataversion(dataset_name)
               episode_id = self.datalist[dataset_idx]['data'][episode_idx]['id']
+              view = self.view_list[0] # TODO: random select a view
               
               # history images
               frame_list = []
               for _ in range(self.frames):
-                     view_list = []
-                     for view in self.view_list:
                      # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
-                            image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{step_idx}.jpg'
-                            image = Image.open(image_path)
-                            if self.transform:
-                                   image = self.transform(image)
-                            view_list.append(image) # TODO warning, this operation may bring different sequences for different views
-                     
-                     frame_list.append(view_list)
-                     step_idx += 1
-                     step_idx = min(step_idx, episode_length - 1)
-              images = torch.stack([torch.stack([view.reshape(3, self.img_size, self.img_size) for view in view_list]) for view_list in frame_list])
-              
-              
-              # future images
-              view_list = []
-              future_idx = min(step_idx + self.skip_frame, episode_length - 1)
-              for view in self.view_list:
-              # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0+self.skip_frame.jpg
-                     image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{future_idx}.jpg'
+                     image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{step_idx}.jpg'
                      image = Image.open(image_path)
                      if self.transform:
                             image = self.transform(image)
-                     view_list.append(image)  
-              future_images = torch.stack([view.reshape(3, self.img_size, self.img_size) for view in view_list])
+                     
+                     frame_list.append(image)
+                     step_idx += 1
+                     step_idx = min(step_idx, episode_length - 1)
+              images = torch.stack([image.reshape(3, self.img_size, self.img_size) for image in frame_list])
+              
+              
+              # future images
+              future_idx = min(step_idx + self.skip_frame, episode_length - 1)
+              image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{future_idx}.jpg'
+              image = Image.open(image_path)
+              if self.transform:
+                     image = self.transform(image)
+              future_images = image.reshape(3, self.img_size, self.img_size)
               
               
               # action and language instruction
@@ -474,7 +468,7 @@ class VPDataset(AIROpenXDataset):
               lang = step_info[0]['lang']
               
               return {"imgs": images,
-                      "future_imgs": future_images,
+                      "label": future_images,
                       "lang": lang}
 
 
