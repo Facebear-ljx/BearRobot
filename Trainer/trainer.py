@@ -70,9 +70,9 @@ class BCTrainer:
               self.save_path = save_path
               
               # resume 
-              if resume_path is not None:
+              try:
                      self.load_model(resume_path)
-              else:
+              except:
                      self.init_step = 0
                      print("train from scratch")
               
@@ -136,11 +136,11 @@ class BCTrainer:
                             batch = next(iterator)
                             
                      imgs = batch['imgs'].to(self.device)
-                     a = batch['a'].to(self.device)
+                     label = batch['label'].to(self.device)
                      lang = batch['lang']
                      
                      self.optimizer.zero_grad()
-                     loss = self.agent(imgs, lang, a)
+                     loss = self.agent(imgs, lang, label)
                      loss.backward()
                      self.optimizer.step()
                      torch.cuda.synchronize()

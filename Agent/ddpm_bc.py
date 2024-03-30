@@ -104,6 +104,13 @@ class DDPM_BC(BaseAgent):
               noise_pred = self.policy(xt, t, cond)
               return noise_pred
        
+       def predict_noise(self, xt, t, cond=None):
+              """
+              predict the noise
+              """
+              noise_pred = self.policy(xt, t, cond)
+              return noise_pred
+       
        def policy_loss(self, x0, cond=None):
               '''
               calculate ddpm loss
@@ -115,7 +122,7 @@ class DDPM_BC(BaseAgent):
               
               xt = self.q_sample(x0, t, noise)
               
-              noise_pred = self.forward(xt, t, cond)
+              noise_pred = self.predict_noise(xt, t, cond)
               loss = (((noise_pred - noise) ** 2).sum(axis = -1)).mean()
               
               return loss
@@ -129,7 +136,7 @@ class DDPM_BC(BaseAgent):
               return xt
        
        @torch.no_grad()
-       def p_sample(self, xt, t, cond=None, guidance_strength=0, clip_sample=True, ddpm_temperature=1.):
+       def p_sample(self, xt, t, cond=None, guidance_strength=0, clip_sample=False, ddpm_temperature=1.):
               """
               sample xt-1 from xt, p(xt-1|xt)
               """
@@ -180,7 +187,7 @@ class DDPM_BC_latent(DDPM_BC):
               self.mmencoder = mmencoder
        
 
-       def forward(self, img: torch.Tensor, cond_img: torch.Tensor=None, cond_lang: list[str]=None):
+       def forward(self, cond_img: torch.Tensor=None, cond_lang: list[str]=None, img: torch.Tensor=None):
               """
               img: torch.tensor, s_t+1, the predicted img
               cond_img: torch.tensor, s_t, the current observed img
@@ -194,8 +201,8 @@ class DDPM_BC_latent(DDPM_BC):
        def encode(self, img: torch.Tensor, cond_img: torch.Tensor=None, cond_lang: list[str]=None):
               """
               encode the img and language instruction into latent space
-              img: torch.tensor, s_t+1, the predicted img
-              cond_img: torch.tensor, s_t, the current observed img
+              img: [B, C, H, W] torch.tensor, s_t+1, the predicted img
+              cond_img: [B, F, C, H, W] torch.tensor, s_t, s_{t-1}, s_{t-2}, ..., s_{t-F}, the current observed history imgs
               cond_lang: list[str], the language instruction
               """
               with torch.no_grad():
@@ -204,8 +211,12 @@ class DDPM_BC_latent(DDPM_BC):
                      except:
                             img = None
                      
+                     B, F, C, H, W = cond_img.shape
+                     cond_img = cond_img.view(B * F, C, H, W)
                      cond_img = self.mmencoder.encode_image(cond_img) if cond_img is not None else None
+                     cond_img = cond_img.view(B, -1)
                      cond_lang = self.mmencoder.encode_lang(cond_lang) if cond_lang is not None else None
+                     
                      try:
                             cond = torch.cat([cond_img, cond_lang], dim=-1)
                      except:
