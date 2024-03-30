@@ -5,8 +5,6 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 
-from einops import rearrange, reduce, repeat
-
 from Net.basic_net.mlp import MLP, MLPResNet
 
 # sinusoidal positional embeds

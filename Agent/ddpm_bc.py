@@ -291,7 +291,7 @@ class IDQL_Agent(BaseAgent):
               return torch.mean(weight * (diff**2))
        
        
-       @torch.no_grad
+       @torch.no_grad()
        def get_action(self, state, from_target=True):
               if from_target:
                      actions = self.policy_target.get_action(state, self.num_sample, clip_sample=True)
