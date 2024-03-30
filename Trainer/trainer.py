@@ -1,4 +1,5 @@
 import copy
+import time
 
 import torch
 import torch.nn as nn
@@ -129,12 +130,14 @@ class BCTrainer:
               torch.cuda.synchronize()
               for step in tqdm(range(self.init_step, steps)):
                      # with tqdm(self.train_dataloader, unit="batch") as pbar:
+                     t0 = time.time()
                      try:
                             batch = next(iterator)
                      except:
                             iterator = iter(self.train_dataloader)
                             batch = next(iterator)
-                            
+                     
+                     t1 = time.time()
                      imgs = batch['imgs'].to(self.device)
                      label = batch['label'].to(self.device)
                      lang = batch['lang']
@@ -143,6 +146,7 @@ class BCTrainer:
                      loss = self.agent(imgs, lang, label)
                      loss.backward()
                      self.optimizer.step()
+                     t2 = time.time()
                      torch.cuda.synchronize()
                      
                      if self.ema is not None:
@@ -151,7 +155,9 @@ class BCTrainer:
                      
                      if self.device == 0:
                             self.logger.log_metrics({"train/policy_loss": loss.item(),
-                                              "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
+                                              "train/lr": self.scheduler.get_last_lr()[0],
+                                              "time/sample": t1-t0,
+                                              "time/train": t2-t1,}, step=step)
                      
                      if self.save:
                             if step % self.save_freq == 0:
