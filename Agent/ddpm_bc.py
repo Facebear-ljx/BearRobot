@@ -155,7 +155,7 @@ class DDPM_BC(BaseAgent):
               return xtm1
        
        @torch.no_grad()
-       def ddpm_sampler(self, shape, cond=None, guidance_strength=0):
+       def ddpm_sampler(self, shape, cond=None, guidance_strength=0, clip_sample=False):
               """
               sample x0 from xT, reverse process
               """
@@ -163,12 +163,12 @@ class DDPM_BC(BaseAgent):
               cond = cond.repeat(x.shape[0], 1)
               
               for t in reversed(range(self.num_timesteps)):
-                     x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), cond)
+                     x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device, clip_sample=clip_sample), cond)
               return x
 
        @torch.no_grad()
-       def get_action(self, state, num=1):
-              return self.ddpm_sampler((num, self.policy.output_dim), cond=state)
+       def get_action(self, state, num=1, clip_sample=False):
+              return self.ddpm_sampler((num, self.policy.output_dim), cond=state, clip_sample=clip_sample)
        
 
 class DDPM_BC_latent(DDPM_BC):
@@ -227,9 +227,9 @@ class DDPM_BC_latent(DDPM_BC):
               return img, cond 
        
        @torch.no_grad()
-       def get_action(self, cond_img: torch.Tensor, cond_lang: list[str], num=1):
+       def get_action(self, cond_img: torch.Tensor, cond_lang: list[str], num=1, clip_sample=False):
               _, cond = self.encode(None, cond_img, cond_lang)
-              return self.ddpm_sampler((num, self.policy.output_dim), cond=cond)
+              return self.ddpm_sampler((num, self.policy.output_dim), cond=cond, clip_sample=clip_sample)
               # TODO implement DDIM sampler to accelerate the sampling
               
               
@@ -294,9 +294,9 @@ class IDQL_Agent(BaseAgent):
        @torch.no_grad
        def get_action(self, state, from_target=True):
               if from_target:
-                     actions = self.policy_target.get_action(state, self.num_sample)
+                     actions = self.policy_target.get_action(state, self.num_sample, clip_sample=True)
               else:
-                     actions = self.policy.get_action(state, self.num_sample)
+                     actions = self.policy.get_action(state, self.num_sample, clip_sample=True)
               
               state = state.repeat(actions.shape[0], 1)
               qs = torch.cat(self.q_models_target(state, actions), axis=1).min(axis=1)[0]
