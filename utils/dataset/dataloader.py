@@ -300,6 +300,15 @@ class RT1Dataset(AIROpenXDataset):
               frames: int=1,
               view_list: list[str]=['image0'],
        ):
+              """
+              rt1 dataset
+              base_dir: the dataset base dir 
+              datalistt: a json file that summarize the dataset
+              dataset_name: not been used
+              img_size: resize the img to [img_size, img_size]
+              frames: history frames per sample
+              vide_list: default to image0, as almost all openx data contains image0
+              """
               super().__init__(base_dir,
                                datalist,
                                dataset_name)
@@ -321,6 +330,9 @@ class RT1Dataset(AIROpenXDataset):
               return 100000 * 128
        
        def discretize(self, tensor, num_bins, min_val, max_val):
+              """
+              discretize the continuous actions from [min_val, max_val] to num_bins bins
+              """
               normalized_tensor = (tensor - min_val) / (max_val - min_val)
               discretized_tensor = torch.floor(normalized_tensor * num_bins).clamp(0, num_bins - 1)
               discretized_tensor = discretized_tensor
@@ -369,7 +381,144 @@ class RT1Dataset(AIROpenXDataset):
               return {"imgs": images,
                       "a": action,
                       "lang": lang}
+
+
+class VPDataset(AIROpenXDataset):
+       def __init__(
+              self,
+              base_dir: str='/data/openxdata_npy',
+              datalist: str='/data/openxdata_npy/datalist.json',
+              dataset_name: str='bridge',
+              img_size: int=128,
+              frames: int=1,
+              skip_frame: int=5,
+              view_list: list[str]=['image0'],
+       ):
+              """
+              video prediction dataset
+              base_dir: the dataset base dir 
+              datalistt: a json file that summarize the dataset
+              dataset_name: not been used
+              img_size: resize the img to [img_size, img_size]
+              frames: history frames per sample
+              skip_frame: given (s_{t-n}, ..., s_t), predict (s_{t+skip_frame})
+              vide_list: default to image0, as almost all openx data contains image0
+              """
+              super().__init__(base_dir,
+                               datalist,
+                               dataset_name)
+              self.img_size = img_size
+              self.frames = frames
+              self.skip_frame = skip_frame
+              self.view_list = view_list
               
+              transform = [
+                     transforms.Resize(256, interpolation=Image.BICUBIC),
+                     transforms.CenterCrop(img_size),
+                     transforms.ToTensor()
+              ]
+              self.transform = transforms.Compose(transform)
+       
+       
+       def __len__(self):
+              return int(1e+6) * 128
+       
+       
+       def __getitem__(self, idx):
+              # select one dataset, one episode, one step
+              dataset_idx = random.choices(range(len(self.dataset_weights)), weights=self.dataset_weights, k=1)[0]
+              episode_idx = random.randint(0, self.datalist[dataset_idx]['all_num'] - 1)
+              episode_length = self.datalist[dataset_idx]['data'][episode_idx]['image_length']
+              step_idx = random.randint(0, max(0, episode_length - 1 - self.frames - self.skip_frame))
+              
+              # some dataset path components
+              dataset_name = self.datalist[dataset_idx]['dataset_name']
+              version = self._openxdataversion(dataset_name)
+              episode_id = self.datalist[dataset_idx]['data'][episode_idx]['id']
+              
+              # history images
+              frame_list = []
+              for _ in range(self.frames):
+                     view_list = []
+                     for view in self.view_list:
+                     # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
+                            image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{step_idx}.jpg'
+                            image = Image.open(image_path)
+                            if self.transform:
+                                   image = self.transform(image)
+                            view_list.append(image) # TODO warning, this operation may bring different sequences for different views
+                     
+                     frame_list.append(view_list)
+                     step_idx += 1
+                     step_idx = min(step_idx, episode_length - 1)
+              images = torch.stack([torch.stack([view.reshape(3, self.img_size, self.img_size) for view in view_list]) for view_list in frame_list])
+              
+              
+              # future images
+              view_list = []
+              future_idx = min(step_idx + self.skip_frame, episode_length - 1)
+              for view in self.view_list:
+              # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0+self.skip_frame.jpg
+                     image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{future_idx}.jpg'
+                     image = Image.open(image_path)
+                     if self.transform:
+                            image = self.transform(image)
+                     view_list.append(image)  
+              future_images = torch.stack([view.reshape(3, self.img_size, self.img_size) for view in view_list])
+              
+              
+              # action and language instruction
+              action_lang_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/action.json'
+              with open(f'{action_lang_path}', 'r') as f:
+                     step_info = json.load(f)
+              lang = step_info[0]['lang']
+              
+              return {"imgs": images,
+                      "future_imgs": future_images,
+                      "lang": lang}
+
+
+             
+def VideoPredictDataLoader(
+       base_dir: str='/data/openxdata_npy',
+       datalist: str='/data/openxdata_npy/datalist.json',
+       dataset_name: str='bridge',
+       img_size: int=128,
+       frames: int=1,
+       skip_frame: int=5,
+       view_list: list[str]=['image0'],
+       batch_size: int=64,
+       num_workers: int=8,
+       pin_mem: bool=True,
+):
+       """
+       this is the video prediction dataloader
+       """
+       rt1dataset = VPDataset(base_dir=base_dir,
+                            datalist=datalist,
+                            dataset_name=dataset_name,
+                            img_size=img_size,
+                            frames=frames,
+                            skip_frame=skip_frame,
+                            view_list=view_list)
+
+       num_tasks = ddp.get_world_size()
+       global_rank = ddp.get_rank()
+       sampler = DistributedSampler(
+            rt1dataset, num_replicas=num_tasks, rank=global_rank, shuffle=True
+       )
+       
+       rt1dataloader = DataLoader(
+              rt1dataset, 
+              sampler=sampler,
+              batch_size=batch_size // num_tasks, 
+              num_workers=num_workers,
+              pin_memory=pin_mem,
+              drop_last=True
+       )
+       
+       return rt1dataloader
+
 
 def RT1DataLoader(
        base_dir: str='/data/openxdata_npy',
