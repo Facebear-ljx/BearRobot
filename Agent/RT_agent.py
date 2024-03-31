@@ -82,6 +82,7 @@ class RT1Agent(BaseAgent):
               # texts: list of instruction
               # state shape [1, D] robot arm x,y,z, gripper state, et al
               """
+              # TODO here has a bug
               if not isinstance(images, torch.Tensor):
                      # transform lists to torch.Tensor
                      images = [torch.stack([torch.stack([self.transform(view).reshape(3, self.img_size, self.img_size) for view in frame_list]) for frame_list in one_images]).unsqueeze(0) for one_images in images]
