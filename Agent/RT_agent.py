@@ -25,7 +25,7 @@ class RT1Agent(BaseAgent):
               
               transform = [
                      transforms.Resize(256, interpolation=Image.BICUBIC),
-                     transforms.CenterCrop(224),
+                     transforms.CenterCrop(self.img_size),
                      transforms.ToTensor()
               ]
               self.transform = transforms.Compose(transform)
