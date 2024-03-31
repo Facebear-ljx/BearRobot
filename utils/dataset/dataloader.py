@@ -415,6 +415,7 @@ class VPDataset(AIROpenXDataset):
               transform = [
                      transforms.Resize(256, interpolation=Image.BICUBIC),
                      transforms.CenterCrop(img_size),
+                     transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
                      transforms.ToTensor()
               ]
               self.transform = transforms.Compose(transform)
