@@ -9,6 +9,7 @@ from Agent.ddpm_bc import DDPM_BC_latent
 
 from utils.dataset.dataloader import VideoPredictDataLoader
 from utils.logger.wandb_log import WandbLogger
+from utils.logger.tb_log import TensorBoardLogger
 from utils.net.initialization import boolean
 from utils import ddp
 from Trainer.trainer import BCTrainer
@@ -62,7 +63,7 @@ def get_args():
 
 def main(rank: int, world_size: int, save_path: str, args):
        # wandb logger
-       wandb_logger = WandbLogger(project_name=args.project_name, run_name=args.dataset_name, args=args, rank=rank) 
+       wandb_logger = TensorBoardLogger(project_name=args.project_name, run_name=args.dataset_name, save_path=save_path, rank=rank) 
        
        # init ddp
        if args.ddp:
