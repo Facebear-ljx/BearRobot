@@ -53,6 +53,7 @@ def get_args():
        parser.set_defaults(pin_mem=True)
        
        # distributed training parameters
+       parser.add_argument('--ddp', default=False, type=boolean, help='use ddp or not')
        parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
        parser.add_argument('--port', default="11112", type=str, help='port for ddp')
        args = parser.parse_args()    
@@ -64,7 +65,10 @@ def main(rank: int, world_size: int, save_path: str, args):
        wandb_logger = WandbLogger(project_name=args.project_name, run_name=args.dataset_name, args=args, rank=rank) 
        
        # init ddp
-       ddp.ddp_setup(rank, world_size, True, args.port)
+       if args.ddp:
+              ddp.ddp_setup(rank, world_size, True, args.port)
+       else:
+              print(f"do not use ddp, train on GPU {rank}")
        
        # dataset and dataloader
        vpdataloader = VideoPredictDataLoader(
@@ -135,5 +139,8 @@ if __name__ == '__main__':
        np.random.seed(seed)
        torch.manual_seed(seed)
        random.seed(seed)
-
-       mp.spawn(main, args=(args.world_size, save_path, args), nprocs=args.world_size)
+       
+       if args.ddp:
+              mp.spawn(main, args=(args.world_size, save_path, args), nprocs=args.world_size)
+       else:
+              main(0, 1, save_path, args)

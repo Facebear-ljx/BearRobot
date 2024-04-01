@@ -42,17 +42,26 @@ class BCTrainer:
               args=None,
               **kwargs,
        ):     
-              torch.distributed.barrier()
+              self.args = args
+              if args.ddp:
+                     torch.distributed.barrier()
               # model
               self.agent_without_ddp = agent
-              self.agent = DDP(agent, device_ids=[device], find_unused_parameters=True)
+              
+              if args.ddp:
+                     self.agent = DDP(agent, device_ids=[device], find_unused_parameters=True)
+              else:
+                     self.agent = self.agent_without_ddp
               
               # dataloader
               self.train_dataloader = train_dataloader
               self.val_dataloader = val_dataloader
               
               # optimizer
-              self.optimizer = OPTIMIZER[optimizer](self.agent.module.policy.parameters(), lr=lr)
+              if args.ddp:
+                     self.optimizer = OPTIMIZER[optimizer](self.agent.module.policy.parameters(), lr=lr)
+              else:
+                     self.optimizer = OPTIMIZER[optimizer](self.agent.policy.parameters(), lr=lr)
               self.ema = ema
               
               # learning rate schedule
@@ -78,7 +87,8 @@ class BCTrainer:
                      print("train from scratch")
               
               self.num_steps = num_steps
-              torch.distributed.barrier()
+              if args.ddp:
+                     torch.distributed.barrier()
               
        def train_epoch(self):
               """
@@ -88,7 +98,8 @@ class BCTrainer:
               self.agent.train()
               for epoch in range(0, epochs):
                      epoch_loss = 0.
-                     torch.cuda.synchronize()
+                     if self.args.ddp:
+                            torch.cuda.synchronize()
                      with tqdm(self.train_dataloader, unit="batch") as pbar:
                             for batch in pbar:
                                    imgs = batch['imgs'].to(self.device)
@@ -99,7 +110,8 @@ class BCTrainer:
                                    loss = self.agent(imgs, lang, a)
                                    loss.backward()
                                    self.optimizer.step()
-                                   torch.cuda.synchronize()
+                                   if self.args.ddp:
+                                          torch.cuda.synchronize()
                                    
                                    pbar.set_description(f"Epoch {epoch} Loss: {loss.item():.4f}")
                                    epoch_loss += loss.item()
@@ -127,7 +139,8 @@ class BCTrainer:
               self.agent.train()
               
               iterator = iter(self.train_dataloader)
-              torch.cuda.synchronize()
+              if self.args.ddp:
+                     torch.cuda.synchronize()
               for step in tqdm(range(self.init_step, steps)):
                      # with tqdm(self.train_dataloader, unit="batch") as pbar:
                      t0 = time.time()
@@ -147,7 +160,8 @@ class BCTrainer:
                      loss.backward()
                      self.optimizer.step()
                      t2 = time.time()
-                     torch.cuda.synchronize()
+                     if self.args.ddp:
+                            torch.cuda.synchronize()
                      
                      if self.ema is not None:
                             self.ema_update()
@@ -173,14 +187,18 @@ class BCTrainer:
               self.logger.finish()
        
        def ema_update(self):
-              for param, target_param in zip(self.agent.module.policy.parameters(), self.agent.module.policy_target.parameters()):
-                     target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
+              if self.args.ddp:
+                     for param, target_param in zip(self.agent.module.policy.parameters(), self.agent.module.policy_target.parameters()):
+                            target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)
+              else:
+                     for param, target_param in zip(self.agent.policy.parameters(), self.agent.policy_target.parameters()):
+                            target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)                     
               
        def save_model(self, step, loss):
               """
               save the model to path
               """
-              save_model = {'model': self.agent.module.state_dict(), 
+              save_model = {'model': self.agent.module.state_dict() if self.args.ddp else self.agent.state_dict(), 
                             'optimizer': self.optimizer.state_dict(), 
                             'schedule': self.scheduler.state_dict(),
                             'step': step}

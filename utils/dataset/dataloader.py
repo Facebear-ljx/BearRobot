@@ -505,7 +505,7 @@ def VideoPredictDataLoader(
        
        rt1dataloader = DataLoader(
               rt1dataset, 
-              sampler=sampler,
+              # sampler=sampler,
               batch_size=batch_size // num_tasks, 
               num_workers=num_workers,
               pin_memory=pin_mem,
@@ -541,7 +541,7 @@ def RT1DataLoader(
        
        rt1dataloader = DataLoader(
               rt1dataset, 
-              sampler=sampler,
+              # sampler=sampler,
               batch_size=batch_size // num_tasks, 
               num_workers=num_workers,
               pin_memory=pin_mem,

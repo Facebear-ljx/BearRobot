@@ -7,5 +7,6 @@ pytorch_fid==0.3.0
 matplotlib==3.8.0
 pynvml==11.5.0
 tensorboard
+SentencePiece
 git+https://github.com/2toinf/DecisionNCE.git
 git+https://github.com/Farama-Foundation/d4rl@master#egg=d4rl
