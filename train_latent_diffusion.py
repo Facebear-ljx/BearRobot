@@ -24,7 +24,7 @@ def get_args():
        parser.add_argument('--device', default='cuda', help='cuda or cpu')
        parser.add_argument('--project_name', default='latent_diffusion_pytorch_example', help='your project name')
        parser.add_argument('--dataset_name', default='all', help='choose your mujoco env')
-       parser.add_argument('--img_size', default=128, type=int, help='image size')
+       parser.add_argument('--img_size', default=224, type=int, help='image size')
        parser.add_argument('--frames', default=3, type=int, help='history frames num')
        parser.add_argument('--skip_frame', default=5, type=int, help='skip number')
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
@@ -53,8 +53,8 @@ def get_args():
        parser.set_defaults(pin_mem=True)
        
        # distributed training parameters
-       parser.add_argument('--world_size', default=4, type=int, help='number of distributed processes')
-       parser.add_argument('--port', default="11111", type=str, help='port for ddp')
+       parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
+       parser.add_argument('--port', default="11112", type=str, help='port for ddp')
        args = parser.parse_args()    
        return args   
 
@@ -117,15 +117,18 @@ if __name__ == '__main__':
        import os
        from datetime import datetime
 
-       previous_dir = os.getcwd()
-       base_dir = "experiments"
-       project_name = args.project_name
-       data_name = args.dataset_name
-       time = datetime.now()
-       time = time.strftime("%Y-%m-%d %H:%M:%S")
-       save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
-       if not os.path.exists(save_path):
-              os.makedirs(save_path)
+       if args.save:
+              previous_dir = os.getcwd()
+              base_dir = "experiments"
+              project_name = args.project_name
+              data_name = args.dataset_name
+              time = datetime.now()
+              time = time.strftime("%Y-%m-%d %H:%M:%S")
+              save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
+              if not os.path.exists(save_path):
+                     os.makedirs(save_path)
+       else:
+              save_path = None
        
        # seed
        seed = args.seed + ddp.get_rank()
