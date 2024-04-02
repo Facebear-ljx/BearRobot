@@ -3,7 +3,7 @@ import wandb
 from utils.logger.base_log import BaseLogger
 
 class WandbLogger(BaseLogger):
-    def __init__(self, project_name, run_name, args, record_freq: int=100, rank=0):
+    def __init__(self, project_name, run_name, args, save_path, record_freq: int=100, rank=0):
               super(BaseLogger).__init__()
               """
               project_name (str): wandb project name

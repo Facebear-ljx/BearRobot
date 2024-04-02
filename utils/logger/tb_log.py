@@ -2,7 +2,7 @@ from utils.logger.base_log import BaseLogger
 from torch.utils.tensorboard import SummaryWriter
 
 class TensorBoardLogger(BaseLogger):
-    def __init__(self, project_name, run_name, save_path, record_freq: int=100, rank=0):
+    def __init__(self, project_name, run_name, args, save_path, record_freq: int=100, rank=0):
               super(BaseLogger).__init__()
               """
               project_name (str): wandb project name

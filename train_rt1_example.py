@@ -50,7 +50,7 @@ def get_args():
 
 def main(rank: int, world_size: int, save_path: str, args):
        # logger
-       wandb_logger = Logger(args.project_name, args.dataset_name, save_path, rank=rank) 
+       wandb_logger = Logger(args.project_name, args.dataset_name, save_path=save_path, rank=rank) 
        
        # init ddp
        if args.ddp:

@@ -15,6 +15,8 @@ from torchvision import transforms
 from utils import ddp
 from torch.utils.data import DistributedSampler
 
+from mmengine import fileio
+import io
 
 EPS = 1e-5
 
@@ -75,6 +77,19 @@ OPENXDATASETS = [
     # 'berkeley_gnm_sac_son', #1 navigation tasks
 ]
 
+def openimage(path):
+       value  = fileio.get(path)
+       img_bytes = np.frombuffer(value, np.uint8)
+       buff = io.BytesIO(img_bytes)
+       img = Image.open(buff).convert('RGB')
+       return img
+
+
+def openjson(path):
+       value  = fileio.get_text(path)
+       dict = json.loads(value)
+       return dict
+
 
 class AIROpenXDataset(Dataset):
        def __init__(
@@ -86,7 +101,7 @@ class AIROpenXDataset(Dataset):
               self.base_dir = base_dir
               self.dataset_name = dataset_name
               
-              self.datalist = json.load(open(datalist, "r"))
+              self.datalist = openjson(datalist)
               self.dataset_weights = self._prepare_sampling_weights()
               
               self.transform = transforms.ToTensor()
@@ -150,7 +165,7 @@ class AIROpenXDataset(Dataset):
               
               # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
               image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{image_type}/{step_idx}.jpg'
-              image = Image.open(image_path)
+              image = openimage(image_path)
               
               if self.transform:
                      image = self.transform(image)
@@ -224,7 +239,7 @@ class RT1Dataset(AIROpenXDataset):
                      for view in self.view_list:
                      # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
                             image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{step_idx}.jpg'
-                            image = Image.open(image_path)
+                            image = openimage(image_path)
                             if self.transform:
                                    image = self.transform(image)
                             view_list.append(image) # TODO warning, this operation may bring different sequences for different views
@@ -234,8 +249,7 @@ class RT1Dataset(AIROpenXDataset):
               
               # actions
               action_lang_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/action.json'
-              with open(f'{action_lang_path}', 'r') as f:
-                     step_info = json.load(f)
+              step_info = openjson(action_lang_path)
               
               ## discretize the action label
               action = step_info[step_idx]['action']
@@ -311,7 +325,7 @@ class VPDataset(AIROpenXDataset):
               for _ in range(self.frames):
                      # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
                      image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{step_idx}.jpg'
-                     image = Image.open(image_path)
+                     image = openimage(image_path)
                      if self.transform:
                             image = self.transform(image)
                      
@@ -324,7 +338,7 @@ class VPDataset(AIROpenXDataset):
               # future images
               future_idx = min(step_idx + self.skip_frame, episode_length - 1)
               image_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/{view}/{future_idx}.jpg'
-              image = Image.open(image_path)
+              image = openimage(image_path)
               if self.transform:
                      image = self.transform(image)
               future_images = image.reshape(3, self.img_size, self.img_size)
@@ -332,8 +346,7 @@ class VPDataset(AIROpenXDataset):
               
               # action and language instruction
               action_lang_path = f'{self.base_dir}/{dataset_name}/{version}/{episode_id}/action.json'
-              with open(f'{action_lang_path}', 'r') as f:
-                     step_info = json.load(f)
+              step_info = openjson(action_lang_path)
               lang = step_info[0]['lang']
               
               return {"imgs": images,
