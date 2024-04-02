@@ -2,7 +2,7 @@ import os
 import torch
 import torch.distributed as dist
 from torch.distributed import init_process_group, destroy_process_group
-
+import subprocess
 
 
 def ddp_setup(rank: int, world_size: int, verbose: bool=False, port: str="12355"):
@@ -19,7 +19,32 @@ def ddp_setup(rank: int, world_size: int, verbose: bool=False, port: str="12355"
        if verbose:
               setup_for_distributed(rank == 0)
        print(f"{rank}"*88)
+       return rank, rank, world_size
 
+
+def ddp_setup_slurm(verbose=False, args=None):
+       rank = int(os.environ['SLURM_PROCID'])
+       gpu = rank % torch.cuda.device_count()
+       world_size = int(os.environ['SLURM_NTASKS'])
+       node_list = os.environ['SLURM_NODELIST']
+       num_gpus = torch.cuda.device_count()
+       addr = subprocess.getoutput(f'scontrol show hostname {node_list} | head -n1')
+       os.environ['MASTER_PORT'] = str(args.port)
+       os.environ['MASTER_ADDR'] = addr
+       os.environ['WORLD_SIZE'] = str(world_size)
+       os.environ['LOCAL_RANK'] = str(gpu)
+       os.environ['RANK'] = str(rank)
+
+       torch.cuda.set_device(gpu)
+       dist_backend = 'nccl'
+       dist_url = "env://"
+       print('| distributed init (rank {}): {}, gpu {}'.format(rank, dist_url, gpu), flush=True)
+       init_process_group(backend=dist_backend, world_size=world_size, rank=rank)
+       torch.distributed.barrier()
+       if verbose:
+              setup_for_distributed(rank == 0)
+       return rank, gpu, world_size
+       
 
 def init_distributed_mode(args, verbose=False):
        print('1'*88)

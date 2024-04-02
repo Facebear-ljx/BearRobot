@@ -1,3 +1,6 @@
+import os
+from datetime import datetime
+
 import random
 import torch
 import numpy as np
@@ -62,15 +65,40 @@ def get_args():
        return args   
 
 
-def main(rank: int, world_size: int, save_path: str, args):
-       # wandb logger
-       wandb_logger = TensorBoardLogger(project_name=args.project_name, run_name=args.dataset_name, args=args, save_path=save_path, rank=rank) 
+def main(rank: int, world_size: int, args):
+       # seed
+       seed = args.seed + ddp.get_rank()
+       np.random.seed(seed)
+       torch.manual_seed(seed)
+       random.seed(seed)
        
        # init ddp
        if args.ddp:
-              ddp.ddp_setup(rank, world_size, True, args.port)
+              global_rank, rank, _ = ddp.ddp_setup(rank, world_size, True, args.port)
        else:
+              global_rank = 0
               print(f"do not use ddp, train on GPU {rank}")
+       
+       # save
+       if args.save and global_rank == 0:
+              previous_dir = os.getcwd()
+              base_dir = "experiments"
+              project_name = args.project_name
+              data_name = args.dataset_name
+              time = datetime.now()
+              time = time.strftime("%Y-%m-%d %H:%M:%S")
+              save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
+              if not os.path.exists(save_path):
+                     os.makedirs(save_path)
+       else:
+              save_path = None
+       
+       # wandb logger
+       wandb_logger = TensorBoardLogger(project_name=args.project_name, 
+                                        run_name=args.dataset_name, 
+                                        args=args, 
+                                        save_path=save_path, 
+                                        rank=global_rank)        
        
        # dataset and dataloader
        vpdataloader = VideoPredictDataLoader(
@@ -105,6 +133,7 @@ def main(rank: int, world_size: int, save_path: str, args):
                                 num_steps=int(args.steps), 
                                 lr=args.lr, 
                                 device=rank,
+                                global_rank=global_rank,
                                 save=args.save,
                                 save_freq=args.save_freq, 
                                 save_path=save_path,
@@ -119,30 +148,7 @@ if __name__ == '__main__':
        args = get_args()
        device = torch.device(args.device)
        
-       # your ckpt save path
-       import os
-       from datetime import datetime
-
-       if args.save:
-              previous_dir = os.getcwd()
-              base_dir = "experiments"
-              project_name = args.project_name
-              data_name = args.dataset_name
-              time = datetime.now()
-              time = time.strftime("%Y-%m-%d %H:%M:%S")
-              save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
-              if not os.path.exists(save_path):
-                     os.makedirs(save_path)
-       else:
-              save_path = None
-       
-       # seed
-       seed = args.seed + ddp.get_rank()
-       np.random.seed(seed)
-       torch.manual_seed(seed)
-       random.seed(seed)
-       
        if args.ddp:
-              mp.spawn(main, args=(args.world_size, save_path, args), nprocs=args.world_size)
+              mp.spawn(main, args=(args.world_size, args), nprocs=args.world_size)
        else:
-              main(0, 1, save_path, args)
+              main(0, 1, args)

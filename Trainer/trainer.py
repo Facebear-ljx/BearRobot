@@ -35,6 +35,7 @@ class BCTrainer:
               ema: float=1e-3,
               optimizer: str='adam',
               device: int=0,
+              global_rank: int=0,
               save: bool=True,
               save_freq: int=10000,
               save_path: str=None,
@@ -70,6 +71,7 @@ class BCTrainer:
               # logger
               self.logger = logger
               self.device = device
+              self.global_rank = global_rank
               
               # evaluator
               self.evaluator = evaluator
@@ -121,7 +123,7 @@ class BCTrainer:
                             self.scheduler.step()
                             
                      avg_loss = epoch_loss / len(self.train_dataloader)
-                     if self.device == 0:
+                     if self.global_rank == 0:
                             self.logger.log_metrics({"train/loss": avg_loss}, step=epoch)
                             print(f"Epoch {epoch} Average Loss: {avg_loss:.4f}")
                      
@@ -167,7 +169,7 @@ class BCTrainer:
                             self.ema_update()
                      self.scheduler.step()
                      
-                     if self.device == 0:
+                     if self.global_rank == 0:
                             self.logger.log_metrics({"train/policy_loss": loss.item(),
                                               "train/lr": self.scheduler.get_last_lr()[0],
                                               "time/sample": t1-t0,
@@ -175,7 +177,7 @@ class BCTrainer:
                      
                      if self.save:
                             if step % self.save_freq == 0:
-                                   if self.device == 0:
+                                   if self.global_rank == 0:
                                           self.save_model(step, loss.item())
                      
                      # if (step + 1) % self.evaluator.eval_freq == 0:
