@@ -7,7 +7,7 @@ from Net.my_model.RT_model import RT1Model
 from Agent.RT_agent import RT1Agent
 
 from utils.dataset.dataloader import RT1DataLoader
-from utils.logger.wandb_log import WandbLogger
+from utils.logger.tb_log import TensorBoardLogger as Logger
 from utils.net.initialization import boolean
 from utils import ddp
 from Trainer.trainer import BCTrainer
@@ -49,8 +49,8 @@ def get_args():
 
 
 def main(rank: int, world_size: int, save_path: str, args):
-       # wandb logger
-       wandb_logger = WandbLogger(project_name=args.project_name, run_name=args.dataset_name, args=args, rank=rank) 
+       # logger
+       wandb_logger = Logger(args.project_name, args.dataset_name, save_path, rank=rank) 
        
        # init ddp
        if args.ddp:
@@ -97,16 +97,18 @@ if __name__ == '__main__':
        import os
        from datetime import datetime
 
-       previous_dir = os.getcwd()
-       base_dir = "experiments"
-       project_name = args.project_name
-       data_name = args.dataset_name
-       time = datetime.now()
-       time = time.strftime("%Y-%m-%d %H:%M:%S")
-       save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
-       
-       if not os.path.exists(save_path):
-              os.makedirs(save_path)
+       if args.save:
+              previous_dir = os.getcwd()
+              base_dir = "experiments"
+              project_name = args.project_name
+              data_name = args.dataset_name
+              time = datetime.now()
+              time = time.strftime("%Y-%m-%d %H:%M:%S")
+              save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
+              if not os.path.exists(save_path):
+                     os.makedirs(save_path)
+       else:
+              save_path = None
        
        # seed
        seed = args.seed + ddp.get_rank()
