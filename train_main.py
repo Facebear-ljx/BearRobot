@@ -6,7 +6,7 @@ from Net.my_model.diffusion_model import MLPDiffusion, IDQLDiffusion
 from Net.my_model.critic_model import MLPV, MLPQs
 from Agent.ddpm_bc import DDPM_BC, IDQL_Agent
 
-from utils.dataset.dataloader import AIROpenXDataset, D4RLDataset
+from utils.dataset.d4rl_dataloader import D4RLDataset
 from Trainer.trainer import RLTrainer
 
 from utils.evaluation.d4rl_eval import D4RLEval
