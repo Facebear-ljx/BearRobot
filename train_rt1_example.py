@@ -86,6 +86,7 @@ def main(rank: int, world_size: int, args):
 
        # dataset and dataloader
        rt1dataloader = RT1DataLoader(
+              img_size=args.img_size,
               frames=args.frames,
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
@@ -119,30 +120,7 @@ if __name__ == '__main__':
        # get log
        args = get_args()
        device = torch.device(args.device)
-       
-       # your ckpt save path
-       import os
-       from datetime import datetime
 
-       if args.save:
-              previous_dir = os.getcwd()
-              base_dir = "experiments"
-              project_name = args.project_name
-              data_name = args.dataset_name
-              time = datetime.now()
-              time = time.strftime("%Y-%m-%d %H:%M:%S")
-              save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
-              if not os.path.exists(save_path):
-                     os.makedirs(save_path)
-       else:
-              save_path = None
-       
-       # seed
-       seed = args.seed + ddp.get_rank()
-       np.random.seed(seed)
-       torch.manual_seed(seed)
-       random.seed(seed)
-       
        if args.ddp:
               mp.spawn(main, args=(args.world_size, args), nprocs=args.world_size)
        else:

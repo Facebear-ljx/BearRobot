@@ -6,13 +6,11 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-from Net.my_model.diffusion_model import IDQLDiffusion
-from Net.encoder.DecisionNCE import DecisionNCE_encoder
-from Agent.ddpm_bc import DDPM_BC_latent
+from Net.my_model.RT_model import RT1Model
+from Agent.RT_agent import RT1Agent
 
-from utils.dataset.dataloader import VideoPredictDataLoader
-from utils.logger.wandb_log import WandbLogger
-from utils.logger.tb_log import TensorBoardLogger
+from utils.dataset.dataloader import RT1DataLoader
+from utils.logger.tb_log import TensorBoardLogger as Logger
 from utils.net.initialization import boolean
 from utils import ddp
 from Trainer.trainer import BCTrainer
@@ -26,31 +24,20 @@ def get_args():
        # customize your argparser
        parser = argparse.ArgumentParser(description='An example to use this model')
        parser.add_argument('--device', default='cuda', help='cuda or cpu')
-       parser.add_argument('--project_name', default='latent_diffusion_pytorch_example', help='your project name')
-       parser.add_argument('--dataset_name', default='all', help='choose your mujoco env')
-       parser.add_argument('--img_size', default=224, type=int, help='image size')
-       parser.add_argument('--frames', default=3, type=int, help='history frames num')
-       parser.add_argument('--skip_frame', default=5, type=int, help='skip number')
+       parser.add_argument('--project_name', default='RT1_pytorch_example', help='your project name')
+       parser.add_argument('--dataset_name', default='bridge', help='choose your mujoco env')
+       parser.add_argument('--img_size', default=128, type=int, help='image size')
+       parser.add_argument('--frames', default=3, type=int, help='frames num input to RT1')
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--steps', default=int(1e+6), type=float, help='train steps')
        parser.add_argument("--seed", default=42, type=int)  # Sets PyTorch and Numpy seeds
-       parser.add_argument('--batch_size', default=512, type=int)
+       parser.add_argument('--batch_size', default=128, type=int)
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
        parser.add_argument('--save', default=True, type=boolean, help='save ckpt or not')
        parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
-       parser.add_argument('--resume', default="None", type=str, help='resume path')
+       parser.add_argument('--resume', default="/home/lijx/ljx/robotics/bearobot/experiments/RT1_pytorch_example/bridge/2024-03-28 22:22:45/50000_1.4489701986312866.pth", type=str, help='resume path')
        parser.add_argument('--wandb', default=False, type=boolean, help='use wandb or not')
 
-       # diffusion model
-       parser.add_argument('--num_blocks', default=6, type=int, help='image size')
-       parser.add_argument('--hidden_dim', default=1024, type=int, help='image size')
-       parser.add_argument('--T', default=100, type=int, help='maximize diffusion time steps')
-       parser.add_argument('--time_embed', default='learned', type=str, help='learned or fixed type time embedding')
-       parser.add_argument('--beta', default='vp', type=str, help='noise schedule')
-
-       # encoder type
-       parser.add_argument("--encoder", default="DecisionNCE-T", type=str, help="choose your encoder")
-       
        # DataLoader parameters
        parser.add_argument('--num_workers', default=8, type=int)
        parser.add_argument('--pin-mem', action='store_true', help='Pin CPU memory in DataLoader for more efficient (sometimes) transfer to GPU.')
@@ -59,8 +46,8 @@ def get_args():
        
        # distributed training parameters
        parser.add_argument('--ddp', default=False, type=boolean, help='use ddp or not')
-       parser.add_argument('--world_size', default=2, type=int, help='number of distributed processes')
-       parser.add_argument('--port', default="11112", type=str, help='port for ddp')
+       parser.add_argument('--world_size', default=3, type=int, help='number of distributed processes')
+       parser.add_argument('--port', default=22323, type=int, help='port')
        args = parser.parse_args()    
        return args   
 
@@ -71,16 +58,17 @@ def main(rank: int, world_size: int, args):
        np.random.seed(seed)
        torch.manual_seed(seed)
        random.seed(seed)
-       
+      
        # init ddp
        if args.ddp:
-              global_rank, rank, _ = ddp.ddp_setup(rank, world_size, True, args.port)
+              global_rank, rank, world_size = ddp.ddp_setup_slurm(True, args)
        else:
               global_rank = 0
               print(f"do not use ddp, train on GPU {rank}")
        
-       # save
-       if args.save and global_rank == 0:
+       # save 
+       if args.save and global_rank==0:
+              # your ckpt save path
               previous_dir = os.getcwd()
               base_dir = "experiments"
               project_name = args.project_name
@@ -92,42 +80,29 @@ def main(rank: int, world_size: int, args):
                      os.makedirs(save_path)
        else:
               save_path = None
-       
-       # wandb logger
-       wandb_logger = TensorBoardLogger(project_name=args.project_name, 
-                                        run_name=args.dataset_name, 
-                                        args=args, 
-                                        save_path=save_path, 
-                                        rank=global_rank)        
-       
+
+       # logger
+       wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=save_path, rank=global_rank) 
+
        # dataset and dataloader
-       vpdataloader = VideoPredictDataLoader(
+       rt1dataloader = RT1DataLoader(
+              base_dir="bj17:s3://zhengjl-dataset/openXdata_npy",
+              datalist="bj17:s3://zhengjl-dataset/openXdata_npy/datalist.json",
+              img_size=args.img_size,
               frames=args.frames,
-              skip_frame=args.skip_frame,
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
               pin_mem=args.pin_mem,
        )
-       
-       # agent and the model for agent
-       encoder = DecisionNCE_encoder(args.encoder, device=rank)
-       cond_dim = encoder.v_dim * args.frames + encoder.l_dim
-       input_dim = encoder.v_dim
-       output_dim = encoder.v_dim
-       vpmodel = IDQLDiffusion(input_dim, 
-                               output_dim, 
-                               cond_dim, 
-                               time_dim=args.hidden_dim,
-                               time_embeding=args.time_embed, 
-                               num_blocks=args.num_blocks,
-                               hidden_dim=args.hidden_dim,
-                               device=rank).to(rank)
-       vpagent = DDPM_BC_latent(vpmodel, schedule=args.beta, num_timesteps=args.T, mmencoder=encoder)      
 
-       # # trainer
-       test_trainer = BCTrainer(vpagent, 
-                                vpdataloader, 
-                                vpdataloader, 
+       # agent and the model for agent
+       rt1model = RT1Model(img_size=args.img_size, device=rank, vision_pretrain=args.visual_pretrain).to(rank)
+       rt1agent = RT1Agent(rt1model)      
+
+       # trainer
+       test_trainer = BCTrainer(rt1agent, 
+                                rt1dataloader, 
+                                rt1dataloader, 
                                 wandb_logger, 
                                 None, 
                                 num_steps=int(args.steps), 
@@ -147,8 +122,5 @@ if __name__ == '__main__':
        # get log
        args = get_args()
        device = torch.device(args.device)
-       
-       if args.ddp:
-              mp.spawn(main, args=(args.world_size, args), nprocs=args.world_size)
-       else:
-              main(0, 1, args)
+
+       main(0, 32, args)
