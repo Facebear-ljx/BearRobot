@@ -36,6 +36,7 @@ def get_args():
        parser.add_argument('--save', default=True, type=boolean, help='save ckpt or not')
        parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
        parser.add_argument('--resume', default="None", type=str, help='resume path')
+       parser.add_argument('--wandb', default=False, type=boolean, help='use wandb or not')
 
        # diffusion model
        parser.add_argument('--num_blocks', default=6, type=int, help='image size')
@@ -63,7 +64,7 @@ def get_args():
 
 def main(rank: int, world_size: int, save_path: str, args):
        # wandb logger
-       wandb_logger = TensorBoardLogger(project_name=args.project_name, run_name=args.dataset_name, save_path=save_path, rank=rank) 
+       wandb_logger = TensorBoardLogger(project_name=args.project_name, run_name=args.dataset_name, args=args, save_path=save_path, rank=rank) 
        
        # init ddp
        if args.ddp:
