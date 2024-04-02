@@ -23,6 +23,6 @@ class DecisionNCE_encoder(nn.Module):
               image_features = self.model.encode_image(imgs)
               return image_features
        
-       def encode_lang(self, langs: list[str]):
+       def encode_lang(self, langs: list):
               lang_features = self.model.encode_text(langs)
               return lang_features

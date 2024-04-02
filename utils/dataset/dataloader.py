@@ -298,7 +298,7 @@ class RT1Dataset(AIROpenXDataset):
               dataset_name: str='bridge',
               img_size: int=128,
               frames: int=1,
-              view_list: list[str]=['image0'],
+              view_list: list=['image0'],
        ):
               """
               rt1 dataset
@@ -392,7 +392,7 @@ class VPDataset(AIROpenXDataset):
               img_size: int=128,
               frames: int=1,
               skip_frame: int=5,
-              view_list: list[str]=['image0'],
+              view_list: list=['image0'],
        ):
               """
               video prediction dataset
@@ -481,7 +481,7 @@ def VideoPredictDataLoader(
        img_size: int=128,
        frames: int=1,
        skip_frame: int=5,
-       view_list: list[str]=['image0'],
+       view_list: list=['image0'],
        batch_size: int=64,
        num_workers: int=8,
        pin_mem: bool=True,
@@ -521,7 +521,7 @@ def RT1DataLoader(
        dataset_name: str='bridge',
        img_size: int=128,
        frames: int=1,
-       view_list: list[str]=['image0'],
+       view_list: list=['image0'],
        batch_size: int=64,
        num_workers: int=8,
        pin_mem: bool=True,

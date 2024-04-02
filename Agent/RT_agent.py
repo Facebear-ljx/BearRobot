@@ -32,7 +32,7 @@ class RT1Agent(BaseAgent):
               
               self.device = self.policy.device
 
-       def forward(self, images: torch.Tensor, texts: list[str], action_gt: torch.Tensor, state=None):
+       def forward(self, images: torch.Tensor, texts: list, action_gt: torch.Tensor, state=None):
               '''
               calculate RT1 loss / cross entropy
               # images: batch of frames of different views, [B, Frame, View, C, H, W]
@@ -43,7 +43,7 @@ class RT1Agent(BaseAgent):
               loss = self.policy_loss(images, texts, action_gt, state)
               return loss
 
-       def logits(self, images: torch.Tensor, texts: list[str], state=None):
+       def logits(self, images: torch.Tensor, texts: list, state=None):
               """
               predict the loogits
               # images: batch of frames of different views, [B, Frame, View, C, H, W]
@@ -53,7 +53,7 @@ class RT1Agent(BaseAgent):
               logits = self.policy(images, texts, state)
               return logits
        
-       def policy_loss(self, images: torch.Tensor, texts: list[str], action_gt: torch.Tensor, state=None):
+       def policy_loss(self, images: torch.Tensor, texts: list, action_gt: torch.Tensor, state=None):
               '''
               calculate RT1 loss / cross entropy
               # images: batch of frames of different views, [B, Frame, View, C, H, W]
@@ -75,7 +75,7 @@ class RT1Agent(BaseAgent):
               raise ValueError("RT1 agent is a BC agent, has no v value")
               
        @torch.no_grad()
-       def get_action(self, images, text: list[str], state=None):
+       def get_action(self, images, text: list, state=None):
               """
               get one action
               # images: one frames of different views, [1, Frame, View, C, H, W]

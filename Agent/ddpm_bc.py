@@ -187,23 +187,23 @@ class DDPM_BC_latent(DDPM_BC):
               self.mmencoder = mmencoder
        
 
-       def forward(self, cond_img: torch.Tensor=None, cond_lang: list[str]=None, img: torch.Tensor=None):
+       def forward(self, cond_img: torch.Tensor=None, cond_lang: list=None, img: torch.Tensor=None):
               """
               img: torch.tensor, s_t+1, the predicted img
               cond_img: torch.tensor, s_t, the current observed img
-              cond_lang: list[str], the language instruction
+              cond_lang: list, the language instruction
               """
               img, cond = self.encode(img, cond_img, cond_lang)
               loss = self.policy_loss(img, cond)
               return loss
 
 
-       def encode(self, img: torch.Tensor, cond_img: torch.Tensor=None, cond_lang: list[str]=None):
+       def encode(self, img: torch.Tensor, cond_img: torch.Tensor=None, cond_lang: list=None):
               """
               encode the img and language instruction into latent space
               img: [B, C, H, W] torch.tensor, s_t+1, the predicted img
               cond_img: [B, F, C, H, W] torch.tensor, s_t, s_{t-1}, s_{t-2}, ..., s_{t-F}, the current observed history imgs
-              cond_lang: list[str], the language instruction
+              cond_lang: list, the language instruction
               """
               with torch.no_grad():
                      try:
@@ -227,7 +227,7 @@ class DDPM_BC_latent(DDPM_BC):
               return img, cond 
        
        @torch.no_grad()
-       def get_action(self, cond_img: torch.Tensor, cond_lang: list[str], num=1, clip_sample=False):
+       def get_action(self, cond_img: torch.Tensor, cond_lang: list, num=1, clip_sample=False):
               _, cond = self.encode(None, cond_img, cond_lang)
               return self.ddpm_sampler((num, self.policy.output_dim), cond=cond, clip_sample=clip_sample)
               # TODO implement DDIM sampler to accelerate the sampling

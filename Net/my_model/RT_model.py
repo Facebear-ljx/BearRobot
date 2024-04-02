@@ -8,7 +8,7 @@ import numpy as np
 import timm.models
 from timm.models import create_model
 from timm.models.layers import DropPath
-from einops import rearrange, reduce, repeat, einsum
+from einops import repeat
 
 from typing import Callable, Optional, Union, Tuple, List, Any
 
@@ -187,7 +187,7 @@ class RT1Model(nn.Module):
               print("model init success!")
               print("-"*88)
               
-       def foward_lang_feature(self, lang: List[str]):
+       def foward_lang_feature(self, lang: list):
               emb = self.lang_encoder.embed_text(lang)
               return emb
        
@@ -250,7 +250,7 @@ class RT1Model(nn.Module):
               
               return logits  # B, F, Action, Bins
 
-       def forward(self, images: torch.Tensor, texts: list[str], state: torch.Tensor = None):
+       def forward(self, images: torch.Tensor, texts: list, state: torch.Tensor = None):
               # images shape [B, Frame, V, C, H, W]
               # state shape [B, Frame, D_s]
               # texts, lists of text instruction
