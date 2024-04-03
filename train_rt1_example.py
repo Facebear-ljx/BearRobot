@@ -47,7 +47,7 @@ def get_args():
        # distributed training parameters
        parser.add_argument('--ddp', default=False, type=boolean, help='use ddp or not')
        parser.add_argument('--world_size', default=3, type=int, help='number of distributed processes')
-       parser.add_argument('--port', default=22323, type=int, help='port')
+       parser.add_argument('--port', default='22323', type=str, help='port')
        args = parser.parse_args()    
        return args   
 

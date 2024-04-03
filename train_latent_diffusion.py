@@ -86,8 +86,6 @@ def main(rank: int, world_size: int, args):
 
        # dataset and dataloader
        rt1dataloader = RT1DataLoader(
-              base_dir="bj17:s3://zhengjl-dataset/openXdata_npy",
-              datalist="bj17:s3://zhengjl-dataset/openXdata_npy/datalist.json",
               img_size=args.img_size,
               frames=args.frames,
               batch_size=args.batch_size, 
@@ -123,4 +121,7 @@ if __name__ == '__main__':
        args = get_args()
        device = torch.device(args.device)
 
-       main(0, 32, args)
+       if args.ddp:
+              mp.spawn(main, args=(args.world_size, args), nprocs=args.world_size)
+       else:
+              main(0, 1, args)

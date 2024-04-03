@@ -8,3 +8,4 @@ test.ipynb
 jinliang_ref/
 *.out
 experiments/
+data/
