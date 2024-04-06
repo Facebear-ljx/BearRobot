@@ -8,5 +8,9 @@ test.ipynb
 jinliang_ref/
 *.out
 experiments/
+<<<<<<< HEAD
 *.sh
 log/
+=======
+data/
+>>>>>>> 567df1d13a334d0424229826180360662047d598

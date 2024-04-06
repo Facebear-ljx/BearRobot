@@ -354,6 +354,83 @@ class VPDataset(AIROpenXDataset):
                       "lang": lang}
 
 
+class AIRKitchenDataset():
+       def __init__(
+              self,
+              base_dir='/data/AIR-toykitchen/AIR-toykitchen',
+              datalist='/data/AIR-toykitchen/AIR-toykitchen_rt1.json',
+              img_size: int=128,
+              frames: int=3,
+              view_list: list=['D435_image'],
+       ):
+              self.base_dir = base_dir
+              self.img_size = img_size
+              self.frames = frames
+              self.view_list = view_list
+              
+              self.datalist = openjson(datalist)
+              
+              transform = [
+                     transforms.Resize(256, interpolation=Image.BICUBIC),
+                     transforms.CenterCrop(img_size),
+                     transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
+                     transforms.ToTensor()
+              ]
+              self.transform = transforms.Compose(transform)
+
+
+       def discretize(self, tensor, num_bins, min_val, max_val):
+              """
+              discretize the continuous actions from [min_val, max_val] to num_bins bins
+              """
+              normalized_tensor = (tensor - min_val) / (max_val - min_val)
+              discretized_tensor = torch.floor(normalized_tensor * num_bins).clamp(0, num_bins - 1)
+              discretized_tensor = discretized_tensor
+              return discretized_tensor
+
+       def __len__(self):
+              try:
+                     return len(self.indexes)
+              except:
+                     return int(1e+6 * 256)
+
+       def __getitem__(self, idx):
+              episode_num = len(self.datalist)
+              episode_idx = random.randint(0, episode_num - 1)
+              
+              step_num = len(self.datalist[episode_idx])
+              step_idx = random.randint(0, max(0, step_num - 1 - self.frames))
+       
+              # images
+              frame_list = []
+              for _ in range(self.frames):
+                     view_list = []
+                     for view in self.view_list:
+                     # e.g. /data/openxdata_npy/bridge/0.1.0/train-0/image0/0.jpg
+                            image_path = self.datalist[episode_idx][step_idx][view]
+                            image = openimage(image_path)
+                            if self.transform:
+                                   image = self.transform(image)
+                            view_list.append(image)
+                     frame_list.append(view_list)
+                     step_idx += 1
+              images = torch.stack([torch.stack([view.reshape(3, self.img_size, self.img_size) for view in view_list]) for view_list in frame_list])
+              
+              # actions
+              action = self.datalist[episode_idx][step_idx]['action']
+              
+              ## discretize the action label
+              action = torch.tensor(action, dtype=torch.float32).view(-1)
+              action[:6] = self.discretize(action[:6], 256, -1., 1.)
+              action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)  # TODO check here
+              
+              # language instruction
+              lang = self.datalist[episode_idx][step_idx]['instruction']
+              
+              return {"imgs": images,
+                      "label": action,
+                      "lang": lang}
+              
              
 def VideoPredictDataLoader(
        base_dir: str='/data/openxdata_npy',
