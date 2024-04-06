@@ -46,24 +46,19 @@ class BCTrainer:
               self.args = args
               if args.ddp:
                      torch.distributed.barrier()
-              # model
-              self.agent_without_ddp = agent
               
+              # optimizer
+              self.optimizer = OPTIMIZER[optimizer](agent.policy.parameters(), lr=lr)
+              self.ema = ema
+                          
+              # ddp & model
               if args.ddp:
-                     self.agent = DDP(agent, device_ids=[device], find_unused_parameters=True)
-              else:
-                     self.agent = self.agent_without_ddp
+                     agent.policy = DDP(agent.policy, device_ids=[device], find_unused_parameters=False)
+              self.agent = agent
               
               # dataloader
               self.train_dataloader = train_dataloader
               self.val_dataloader = val_dataloader
-              
-              # optimizer
-              if args.ddp:
-                     self.optimizer = OPTIMIZER[optimizer](self.agent.module.policy.parameters(), lr=lr)
-              else:
-                     self.optimizer = OPTIMIZER[optimizer](self.agent.policy.parameters(), lr=lr)
-              self.ema = ema
               
               # learning rate schedule
               self.scheduler = LR_SCHEDULE['cosine'](self.optimizer, num_steps)
@@ -100,8 +95,6 @@ class BCTrainer:
               self.agent.train()
               for epoch in range(0, epochs):
                      epoch_loss = 0.
-                     if self.args.ddp:
-                            torch.cuda.synchronize()
                      with tqdm(self.train_dataloader, unit="batch") as pbar:
                             for batch in pbar:
                                    imgs = batch['imgs'].to(self.device)
@@ -141,8 +134,6 @@ class BCTrainer:
               self.agent.train()
               
               iterator = iter(self.train_dataloader)
-              if self.args.ddp:
-                     torch.cuda.synchronize()
               for step in tqdm(range(self.init_step, steps)):
                      # with tqdm(self.train_dataloader, unit="batch") as pbar:
                      t0 = time.time()
@@ -165,8 +156,8 @@ class BCTrainer:
                      if self.args.ddp:
                             torch.cuda.synchronize()
                      
-                     if self.ema is not None:
-                            self.ema_update()
+                     # if self.ema is not None:
+                     #        self.ema_update()
                      self.scheduler.step()
                      
                      if self.global_rank == 0:

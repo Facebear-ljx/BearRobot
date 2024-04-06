@@ -47,7 +47,7 @@ def get_args():
        # distributed training parameters
        parser.add_argument('--ddp', default=False, type=boolean, help='use ddp or not')
        parser.add_argument('--world_size', default=3, type=int, help='number of distributed processes')
-       parser.add_argument('--port', default=22323, type=int, help='port')
+       parser.add_argument('--port', default='22323', type=str, help='port')
        args = parser.parse_args()    
        return args   
 
@@ -61,7 +61,7 @@ def main(rank: int, world_size: int, args):
       
        # init ddp
        if args.ddp:
-              global_rank, rank, world_size = ddp.ddp_setup_slurm(True, args)
+              global_rank, rank, _ = ddp.ddp_setup(rank, world_size, True, args.port)
        else:
               global_rank = 0
               print(f"do not use ddp, train on GPU {rank}")

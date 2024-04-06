@@ -9,12 +9,14 @@ import copy
 
 from Agent.base_agent import BaseAgent
 from Net.my_model.RT_model import RT1Model
-
+from Net.my_model.t5 import T5Encoder
 
 class RT1Agent(BaseAgent):
        def __init__(
               self, 
               policy: RT1Model, 
+              text_encoder = 't5',
+              device = 'cuda'
        ):
               super().__init__(
                      policy,
@@ -29,8 +31,10 @@ class RT1Agent(BaseAgent):
                      transforms.ToTensor()
               ]
               self.transform = transforms.Compose(transform)
-              
-              self.device = self.policy.device
+              assert text_encoder == 't5'
+              self.lang_encoder = T5Encoder(device=device)
+              print("lang encoder load success")
+              self.device = device
 
        def forward(self, images: torch.Tensor, texts: list, action_gt: torch.Tensor, state=None):
               '''
@@ -40,7 +44,8 @@ class RT1Agent(BaseAgent):
               # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
               # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
               '''
-              loss = self.policy_loss(images, texts, action_gt, state)
+              text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
+              loss = self.policy_loss(images, text_emb, action_gt, state)
               return loss
 
        def logits(self, images: torch.Tensor, texts: list, state=None):

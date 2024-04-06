@@ -116,7 +116,6 @@ class RT1Model(nn.Module):
               num_output_token: int=8,
               condition_dim_mult: int=2,
               vision_encoder: str='maxvit_rmlp_base_rw_224',
-              text_encoder: str='t5',
               vision_pretrain: bool=True,
               state_dim=None,
               device: str='cpu',
@@ -130,11 +129,8 @@ class RT1Model(nn.Module):
               self.num_output_token = num_output_token
               
               print("-"*88)
-              assert text_encoder == 't5'
-              self.lang_encoder = T5Encoder(device=device)
               condition_dim = 768
               self.condition_dim = condition_dim * condition_dim_mult
-              print("lang encoder load success")
               
               assert vision_encoder == 'maxvit_rmlp_base_rw_224'
               self.visual_encoder: timm.models.MaxxVit = create_model(
@@ -187,9 +183,6 @@ class RT1Model(nn.Module):
               print("model init success!")
               print("-"*88)
               
-       def foward_lang_feature(self, lang: list):
-              emb = self.lang_encoder.embed_text(lang)
-              return emb
        
        def forward_image_feature(self, images: torch.Tensor, condition: torch.Tensor):
               # images shape [B, Frame, View, C, H, W]
@@ -250,13 +243,11 @@ class RT1Model(nn.Module):
               
               return logits  # B, F, Action, Bins
 
-       def forward(self, images: torch.Tensor, texts: list, state: torch.Tensor = None):
+       def forward(self, images: torch.Tensor, condition: torch.Tensor, state: torch.Tensor = None):
               # images shape [B, Frame, V, C, H, W]
               # state shape [B, Frame, D_s]
-              # texts, lists of text instruction
+              # condition, text emb
               # images_view_2 [B, Frame, C, H, W]
-              condition = self.foward_lang_feature(texts)
-              
               image_tokens = self.forward_image_feature(images, condition)
               B, F, N, D = image_tokens.shape
 
