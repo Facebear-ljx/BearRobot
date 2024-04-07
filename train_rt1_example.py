@@ -86,6 +86,7 @@ def main(rank: int, world_size: int, args):
 
        # dataset and dataloader
        rt1dataloader = RT1DataLoader(
+              datalist='/home/lijx/ljx/robotics/bearobot/data/bridge/bridge_datalist.json',
               img_size=args.img_size,
               frames=args.frames,
               batch_size=args.batch_size, 

@@ -220,7 +220,7 @@ class RT1Dataset_new():
               for img_path in reversed(imgs_path):
                      image = openimage(img_path)
                      if self.transform:
-                            image = self.transform(image).reshape(3, self.img_size, self.img_size)
+                            image = self.transform(image).reshape(1, 3, self.img_size, self.img_size)
                      frame_list.append(image)
               images = torch.stack([image for image in frame_list])
               
