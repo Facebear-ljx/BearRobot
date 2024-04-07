@@ -172,6 +172,62 @@ class AIROpenXDataset(Dataset):
               return image
        
 
+class RT1Dataset_new():
+       def __init__(
+              self,
+              datalist: str='/home/lijx/ljx/robotics/bearobot/data/bridge/bridge_datalist.json',
+              img_size: int=128,
+       ):       
+              self.img_size = img_size
+              self.datalist = openjson(datalist)
+              
+              transform = [
+                     transforms.Resize(256, interpolation=Image.BICUBIC),
+                     transforms.CenterCrop(img_size),
+                     transforms.ToTensor()
+              ]
+              
+              self.transform = transforms.Compose(transform)        
+              
+              self.action_keys = ["world_vector", "rotation_delta", "open_gripper"]   
+       
+       def discretize(self, tensor, num_bins, min_val, max_val):
+              """
+              discretize the continuous actions from [min_val, max_val] to num_bins bins
+              """
+              normalized_tensor = (tensor - min_val) / (max_val - min_val)
+              discretized_tensor = torch.floor(normalized_tensor * num_bins).clamp(0, num_bins - 1)
+              discretized_tensor = discretized_tensor
+              return discretized_tensor
+       
+       def __len__(self):
+              return len(self.datalist)
+       
+       def __getitem__(self, idx):
+              step = self.datalist[idx]
+              imgs_path = step['imgs']
+              action = step['label']
+              lang = step['lang']
+              
+              # discretize the action
+              action = torch.cat([torch.tensor(action[key], dtype=torch.float32).view(-1) for key in self.action_keys])
+              action[:6] = self.discretize(action[:6], 256, -1., 1.)
+              action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)
+              
+              # images
+              frame_list = []
+              # [image t+2, image t+1, image t] -> [image t, image t+1, image t+2]
+              for img_path in reversed(imgs_path):
+                     image = openimage(img_path)
+                     if self.transform:
+                            image = self.transform(image).reshape(3, self.img_size, self.img_size)
+                     frame_list.append(image)
+              images = torch.stack([image for image in frame_list])
+              
+              return {"imgs": images,
+                      "label": action,
+                      "lang": lang}
+                                   
 
 class RT1Dataset(AIROpenXDataset):
        def __init__(
@@ -484,12 +540,8 @@ def RT1DataLoader(
        num_workers: int=8,
        pin_mem: bool=True,
 ):
-       rt1dataset = RT1Dataset(base_dir=base_dir,
-                               datalist=datalist,
-                               dataset_name=dataset_name,
-                               img_size=img_size,
-                               frames=frames,
-                               view_list=view_list)
+       rt1dataset = RT1Dataset_new(datalist=datalist,
+                                   img_size=img_size)
 
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()
@@ -499,7 +551,7 @@ def RT1DataLoader(
        
        rt1dataloader = DataLoader(
               rt1dataset, 
-              # sampler=sampler,
+              sampler=sampler,
               batch_size=batch_size // num_tasks, 
               num_workers=num_workers,
               pin_memory=pin_mem,
