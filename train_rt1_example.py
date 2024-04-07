@@ -57,7 +57,9 @@ def main(rank: int, world_size: int, args):
        seed = args.seed + ddp.get_rank()
        np.random.seed(seed)
        torch.manual_seed(seed)
+       torch.cuda.manual_seed_all(seed)
        random.seed(seed)
+       torch.backends.cudnn.deterministic = True
        
        # init ddp
        if args.ddp:
