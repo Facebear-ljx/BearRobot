@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from Net.my_model.RT_model import RT1Model
 from Agent.RT_agent import RT1Agent
 
-from utils.dataset.dataloader import RT1DataLoader
+from utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader
 from utils.logger.tb_log import TensorBoardLogger as Logger
 from utils.net.initialization import boolean
 from utils import ddp
@@ -30,6 +30,7 @@ def get_args():
        parser.add_argument('--frames', default=3, type=int, help='frames num input to RT1')
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--steps', default=int(1e+6), type=float, help='train steps')
+       parser.add_argument('--val_freq', default=int(5e+3), type=float, help='val frequency')
        parser.add_argument("--seed", default=42, type=int)  # Sets PyTorch and Numpy seeds
        parser.add_argument('--batch_size', default=128, type=int)
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
@@ -86,9 +87,17 @@ def main(rank: int, world_size: int, args):
 
        # dataset and dataloader
        rt1dataloader = RT1DataLoader(
-              datalist='/home/lijx/ljx/robotics/bearobot/data/bridge/bridge_datalist.json',
+              datalist='/home/dodo/ljx/BearRobot/data/bridge/bridge_datalist_train.json',
               img_size=args.img_size,
               frames=args.frames,
+              batch_size=args.batch_size, 
+              num_workers=args.num_workers,
+              pin_mem=args.pin_mem,
+       )
+       
+       valdataloader = RT1ValDataLoader(
+              datalist='/home/dodo/ljx/BearRobot/data/bridge/bridge_datalist_test.json',
+              img_size=args.img_size,
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
               pin_mem=args.pin_mem,
@@ -101,7 +110,7 @@ def main(rank: int, world_size: int, args):
        # trainer
        test_trainer = BCTrainer(rt1agent, 
                                 rt1dataloader, 
-                                rt1dataloader, 
+                                valdataloader, 
                                 wandb_logger, 
                                 None, 
                                 num_steps=int(args.steps), 

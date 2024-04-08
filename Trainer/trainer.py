@@ -173,14 +173,37 @@ class BCTrainer:
                                    if self.global_rank == 0:
                                           self.save_model(step, loss.item())
                      
-                     # if (step + 1) % self.evaluator.eval_freq == 0:
-                            # rewards = self.evaluator.eval_episodes(self.agent, step)
-                            # print(f"Epoch {step} Average return: {rewards:.4f}")
-                            # print(f"Evaluation needs ")
-                            # pass
+                     if step % self.args.val_freq == 0:
+                            self.validation(step)
               
               self.logger.finish()
        
+       
+       def validation(self, step):
+              t1 = time.time()
+              val_loss = 0
+              self.agent.eval()
+              with torch.no_grad():
+                     with tqdm(self.val_dataloader, unit="batch") as pbar:
+                            for batch in pbar:
+                                   imgs = batch['imgs'].to(self.device)
+                                   a = batch['label'].to(self.device)
+                                   lang = batch['lang']
+                                   loss = self.agent(imgs, lang, a)
+                                   
+                                   pbar.set_description(f"Step {step} Loss: {loss.item():.4f}")
+                                   val_loss += loss.item()
+              
+              avg_loss = val_loss / len(self.val_dataloader)
+              
+              t2 = time.time()
+              if self.global_rank == 0:
+                     self.logger.log_metrics({"val/policy_loss": avg_loss, "time/val": t2-t1}, step=step)      
+              self.agent.train()
+              if self.args.ddp:
+                     torch.distributed.barrier()
+       
+
        def ema_update(self):
               if self.args.ddp:
                      for param, target_param in zip(self.agent.module.policy.parameters(), self.agent.module.policy_target.parameters()):

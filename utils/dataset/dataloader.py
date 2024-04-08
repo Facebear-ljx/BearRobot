@@ -560,3 +560,26 @@ def RT1DataLoader(
        )
        
        return rt1dataloader
+
+
+def RT1ValDataLoader(
+       datalist: str='/data/openxdata_npy/datalist.json',
+       img_size: int=128,
+       batch_size: int=16,
+       num_workers: int=8,
+       pin_mem: bool=True,
+):
+       rt1dataset = RT1Dataset_new(datalist=datalist,
+                                   img_size=img_size)
+
+       num_tasks = ddp.get_world_size()
+       
+       rt1dataloader = DataLoader(
+              rt1dataset, 
+              batch_size=batch_size // num_tasks, 
+              num_workers=num_workers,
+              pin_memory=pin_mem,
+              drop_last=True
+       )
+       
+       return rt1dataloader
