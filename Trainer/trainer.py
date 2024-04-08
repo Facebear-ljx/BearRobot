@@ -136,45 +136,51 @@ class BCTrainer:
               self.agent.train()
               
               iterator = iter(self.train_dataloader)
-              for step in tqdm(range(self.init_step, steps)):
-                     # with tqdm(self.train_dataloader, unit="batch") as pbar:
-                     t0 = time.time()
-                     try:
-                            batch = next(iterator)
-                     except:
-                            iterator = iter(self.train_dataloader)
-                            batch = next(iterator)
-                     
-                     t1 = time.time()
-                     imgs = batch['imgs'].to(self.device)
-                     label = batch['label'].to(self.device)
-                     lang = batch['lang']
-                     
-                     self.optimizer.zero_grad()
-                     loss = self.agent(imgs, lang, label)
-                     loss.backward()
-                     self.optimizer.step()
-                     t2 = time.time()
-                     if self.args.ddp:
-                            torch.cuda.synchronize()
-                     
-                     # if self.ema is not None:
-                     #        self.ema_update()
-                     self.scheduler.step()
-                     
-                     if self.global_rank == 0:
-                            self.logger.log_metrics({"train/policy_loss": loss.item(),
-                                              "train/lr": self.scheduler.get_last_lr()[0],
-                                              "time/sample": t1-t0,
-                                              "time/train": t2-t1,}, step=step)
-                     
-                     if self.save:
-                            if step % self.save_freq == 0:
-                                   if self.global_rank == 0:
-                                          self.save_model(step, loss.item())
-                     
-                     if step % self.args.val_freq == 0:
-                            self.validation(step)
+              with tqdm(range(self.init_step, steps)) as pbar:
+                     for step in pbar:
+                            # get one batch sample
+                            t0 = time.time()
+                            try:
+                                   batch = next(iterator)
+                            except:
+                                   iterator = iter(self.train_dataloader)
+                                   batch = next(iterator)
+                            
+                            t1 = time.time()
+                            imgs = batch['imgs'].to(self.device)
+                            label = batch['label'].to(self.device)
+                            lang = batch['lang']
+                            
+                            # one gradient step
+                            self.optimizer.zero_grad()
+                            loss = self.agent(imgs, lang, label)
+                            loss.backward()
+                            self.optimizer.step()
+                            t2 = time.time()
+                            if self.args.ddp:
+                                   torch.cuda.synchronize()
+                            
+                            # if self.ema is not None:
+                            #        self.ema_update()
+                            self.scheduler.step()
+                            
+                            # log
+                            if self.global_rank == 0:
+                                   pbar.set_description(f"Step {step} train Loss: {loss.item():.4f}")
+                                   self.logger.log_metrics({"train/policy_loss": loss.item(),
+                                                 "train/lr": self.scheduler.get_last_lr()[0],
+                                                 "time/sample": t1-t0,
+                                                 "time/train": t2-t1,}, step=step)
+                            
+                            # save
+                            if self.save:
+                                   if step % self.save_freq == 0:
+                                          if self.global_rank == 0:
+                                                 self.save_model(step, loss.item())
+                            
+                            # validation
+                            if (step + 1) % self.args.val_freq == 0:
+                                   self.validation(step)
               
               self.logger.finish()
        
@@ -191,7 +197,7 @@ class BCTrainer:
                                    lang = batch['lang']
                                    loss = self.agent(imgs, lang, a)
                                    
-                                   pbar.set_description(f"Step {step} Loss: {loss.item():.4f}")
+                                   pbar.set_description(f"Step {step} val Loss: {loss.item():.4f}")
                                    val_loss += loss.item()
               
               avg_loss = val_loss / len(self.val_dataloader)

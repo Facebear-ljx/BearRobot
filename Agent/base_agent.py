@@ -14,7 +14,7 @@ class BaseAgent(nn.Module):
        ):       
               super().__init__()
               self.policy = policy
-              self.policy_target = copy.deepcopy(policy)
+              # self.policy_target = copy.deepcopy(policy)
               self.v_model = v_model
               self.q_models = q_models
               self.q_models_target = copy.deepcopy(q_models)
