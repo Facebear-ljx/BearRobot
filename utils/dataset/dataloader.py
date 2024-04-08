@@ -182,8 +182,9 @@ class RT1Dataset_new():
               self.datalist = openjson(datalist)
               
               transform = [
-                     transforms.Resize(256, interpolation=Image.BICUBIC),
-                     transforms.CenterCrop(img_size),
+                     # transforms.Resize(256, interpolation=Image.BICUBIC),
+                     transforms.RandomResizedCrop(img_size, scale=(0.75, 1), interpolation=Image.BICUBIC),
+                     transforms.ColorJitter(0.2, 0.2, 0.2, 0.2),
                      transforms.ToTensor()
               ]
               

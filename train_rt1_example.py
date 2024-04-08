@@ -33,9 +33,13 @@ def get_args():
        parser.add_argument("--seed", default=42, type=int)  # Sets PyTorch and Numpy seeds
        parser.add_argument('--batch_size', default=128, type=int)
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
+       
+       # save log parameters
        parser.add_argument('--save', default=True, type=boolean, help='save ckpt or not')
+       parser.add_argument('--save_path', default='experiments/rt1', type=str, help='ckpt save path')
        parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
-       parser.add_argument('--resume', default="/home/lijx/ljx/robotics/bearobot/experiments/RT1_pytorch_example/bridge/2024-03-28 22:22:45/50000_1.4489701986312866.pth", type=str, help='resume path')
+       parser.add_argument('--log_path', default='experiments/rt1', type=str, help='ckpt save path')
+       parser.add_argument('--resume', default=None, type=str, help='resume path')
        parser.add_argument('--wandb', default=False, type=boolean, help='use wandb or not')
        
        # DataLoader parameters
@@ -71,20 +75,14 @@ def main(rank: int, world_size: int, args):
        # save 
        if args.save and global_rank==0:
               # your ckpt save path
-              previous_dir = os.getcwd()
-              base_dir = "experiments"
-              project_name = args.project_name
-              data_name = args.dataset_name
-              time = datetime.now()
-              time = time.strftime("%Y-%m-%d %H:%M:%S")
-              save_path = f"{previous_dir}/{base_dir}/{project_name}/{data_name}/{time}"
+              save_path = args.save_path
               if not os.path.exists(save_path):
                      os.makedirs(save_path)
        else:
-              save_path = 'log'
+              save_path = None
 
        # logger
-       wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=save_path, rank=global_rank) 
+       wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
 
        # dataset and dataloader
        rt1dataloader = RT1DataLoader(

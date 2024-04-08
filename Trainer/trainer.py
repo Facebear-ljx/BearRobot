@@ -1,4 +1,6 @@
 import copy
+import io
+from mmengine import fileio
 import time
 
 import torch
@@ -61,7 +63,7 @@ class BCTrainer:
               self.val_dataloader = val_dataloader
               
               # learning rate schedule
-              self.scheduler = LR_SCHEDULE['cosine'](self.optimizer, num_steps)
+              self.scheduler = LR_SCHEDULE['cosine'](self.optimizer, num_steps, eta_min=1e-6)
               
               # logger
               self.logger = logger
@@ -191,25 +193,32 @@ class BCTrainer:
               """
               save the model to path
               """
-              save_model = {'model': self.agent.module.state_dict() if self.args.ddp else self.agent.state_dict(), 
+              save_model = {'model': self.agent.state_dict(), 
                             'optimizer': self.optimizer.state_dict(), 
                             'schedule': self.scheduler.state_dict(),
                             'step': step}
-              torch.save(save_model, f"{self.save_path}/{step}_{loss}.pth")
+
+              with io.BytesIO() as f:
+                     torch.save(save_model, f)
+                     fileio.put(f.getvalue(), f"{self.save_path}/{step}_{loss}.pth")
+                     # fileio.put(f.getvalue(), f"{self.save_path}/latest.pth")
               
        def load_model(self, path: str):
               """
               load ckpt from path
               """
               print(f"loading ckpt from {path}")
-              ckpt = torch.load(path, map_location='cpu')
+
+              ckpt = fileio.get(path)
+              with io.BytesIO(ckpt) as f:
+                     ckpt = torch.load(f, map_location='cpu')
               
               # load model
               try:
-                     self.agent.module.load_state_dict(ckpt['model'])
+                     self.agent.load_state_dict(ckpt['model'])
                      self.agent = self.agent.to(self.device)
               except:
-                     self.agent.module.load_state_dict(ckpt)
+                     self.agent.load_state_dict(ckpt)
                      self.agent = self.agent.to(self.device)                     
               print("Model load done")
               
