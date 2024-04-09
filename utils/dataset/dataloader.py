@@ -216,14 +216,10 @@ class RT1Dataset_new():
               action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)
               
               # images
-              frame_list = []
               # [image t+2, image t+1, image t] -> [image t, image t+1, image t+2]
-              for img_path in reversed(imgs_path):
-                     image = openimage(img_path)
-                     if self.transform:
-                            image = self.transform(image).reshape(1, 3, self.img_size, self.img_size)
-                     frame_list.append(image)
-              images = torch.stack([image for image in frame_list])
+              image = openimage(imgs_path[0])
+              if self.transform:
+                     images = self.transform(image).reshape(1, 1, 3, self.img_size, self.img_size)
               
               return {"imgs": images,
                       "label": action,
