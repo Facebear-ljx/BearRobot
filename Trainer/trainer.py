@@ -79,10 +79,10 @@ class BCTrainer:
               self.save_path = save_path
               
               # resume 
+              self.init_step = 0
               try:
                      self.load_model(resume_path)
               except:
-                     self.init_step = 0
                      print("train from scratch")
               
               self.num_steps = num_steps
@@ -174,7 +174,7 @@ class BCTrainer:
                             
                             # save
                             if self.save:
-                                   if step % self.save_freq == 0:
+                                   if (step + 1) % self.save_freq == 0:
                                           if self.global_rank == 0:
                                                  self.save_model(step, loss.item())
                             
@@ -218,13 +218,13 @@ class BCTrainer:
                      for param, target_param in zip(self.agent.policy.parameters(), self.agent.policy_target.parameters()):
                             target_param.data.copy_(self.ema * param.data + (1 - self.ema) * target_param.data)                     
               
-       def save_model(self, step, loss):
+       def save_model(self, step, loss, save_optimizer=False, save_schedule=False):
               """
               save the model to path
               """
               save_model = {'model': self.agent.state_dict(), 
-                            'optimizer': self.optimizer.state_dict(), 
-                            'schedule': self.scheduler.state_dict(),
+                            'optimizer': self.optimizer.state_dict() if save_optimizer else None, 
+                            'schedule': self.scheduler.state_dict() if save_schedule else None,
                             'step': step}
 
               with io.BytesIO() as f:
