@@ -18,7 +18,8 @@ class ResNet(nn.Module):
               pretrained: bool = False,
               norm_type: str = "bn",
               pooling_type: str = "avg",
-              *args, **kwargs) -> None:
+              *args, **kwargs
+       ):
               super().__init__(*args, **kwargs)
               self.model = timm.create_model(model_name, pretrained=pretrained)
 
@@ -39,6 +40,12 @@ class ResNet(nn.Module):
               output = self.model(img)
               return output
        
+       def stem(self, img):
+              output = self.model.conv1(img)
+              output = self.model.bn1(output)
+              output = self.model.act1(output)
+              output = self.model.maxpool(output)
+              return output
        
        def _replace_bn(self):
               root_module = self.model
