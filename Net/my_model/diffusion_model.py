@@ -119,6 +119,8 @@ class IDQLDiffusion(nn.Module):
               
        def forward(self, xt, t, cond=None):
               # encode
+              if not isinstance(t, torch.Tensor):
+                     t = torch.tensor(t, device=self.device)
               time_embedding = self.time_process(t.view(-1, 1))
               time_embedding = self.time_encoder(time_embedding)
               if cond is not None:
@@ -217,11 +219,28 @@ class VisualDiffusion(nn.Module):
               return image_feature
  
        
-       def forward(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, cond=None):
+       def forward(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, cond: list=None, state=None):
+              """_summary_
+
+              Args:
+                  xt (torch.Tensor): noisy action
+                  t (torch.Tensor): time step
+                  imgs (torch.Tensor): [Batch, Frames, Views, C, H, W], batch of frames of different views
+                  cond (list): language condition. Defaults to None.
+                  state (_type_, optional): robot arm state. Defaults to None.
+
+              Raises:
+                  NotImplementedError: _description_
+
+              Returns:
+                  torch.Tensor: predicted noise
+              """
               # flatted xt
               xt = xt.reshape([xt.shape[0], -1])
               
               # encode
+              if not isinstance(t, torch.Tensor):
+                     t = torch.tensor(t, device=self.device)
               time_embedding = self.time_process(t.view(-1, 1))
               time_embedding = self.time_encoder(time_embedding)
               if cond is not None:

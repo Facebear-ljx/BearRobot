@@ -2,11 +2,15 @@ import torch
 import math
 import torch.nn as nn
 import torch.nn.functional as F
+from torchvision import transforms
 import numpy as np
 import copy
 
-from Agent.base_agent import BaseAgent
+from PIL import Image
 
+from Agent.base_agent import BaseAgent
+from Net.my_model.diffusion_model import VisualDiffusion
+from Net.my_model.t5 import T5Encoder
 
 def extract(a, x_shape):
        '''
@@ -97,23 +101,42 @@ class DDPM_BC(BaseAgent):
               self.alphas = (1 - self.betas).to(self.device)
               self.alphas_cumprod = torch.cumprod(self.alphas, dim=0).to(self.device)
 
-       def forward(self, xt, t, cond=None):
+       def forward(self, xt: torch.Tensor, t: torch.Tensor, cond: torch.Tensor=None):
               """
               predict the noise
+              Input:
+              xt: noisy samples, here xt is typically the ground truth action
+              t: timestep
+              cond: condition information, here cond is typically the state rather than other condition like language or goal image
+              
+              Return: predicted noise
               """
               noise_pred = self.policy(xt, t, cond)
               return noise_pred
        
-       def predict_noise(self, xt, t, cond=None):
+       def predict_noise(self, xt: torch.Tensor, t: torch.Tensor, cond: torch.Tensor=None):
               """
               predict the noise
+              
+              Input:
+              xt: noisy samples, here xt is typically the noisy ground truth action
+              t: timestep
+              cond: condition information, here cond is typically the state rather than other condition like language or goal image
+              
+              Return: predicted noise
               """
               noise_pred = self.policy(xt, t, cond)
               return noise_pred
        
-       def policy_loss(self, x0, cond=None):
+       def policy_loss(self, x0: torch.Tensor, cond: torch.Tensor=None):
               '''
               calculate ddpm loss
+              
+              Input:
+              x0: ground truth value, here x0 is typically the ground truth action
+              cond: condition information, here cond is typically the state rather than other condition like language or goal image
+              
+              Return: ddpm loss
               '''
               batch_size = x0.shape[0]
               
@@ -127,21 +150,36 @@ class DDPM_BC(BaseAgent):
               
               return loss
               
-       def q_sample(self, x0, t, noise):
+       def q_sample(self, x0: torch.Tensor, t: torch.Tensor, noise: torch.Tensor):
               """
               sample noisy xt from x0, q(xt|x0), forward process
+              
+              Input:
+              x0: ground truth value, here x0 is typically the ground truth action
+              t: timestep
+              noise: noise
+              
+              Return: noisy samples
               """
               alphas_cumprod_t = self.alphas_cumprod[t]
               xt = x0 * extract(torch.sqrt(alphas_cumprod_t), x0.shape) + noise * extract(torch.sqrt(1 - alphas_cumprod_t), x0.shape)
               return xt
        
        @torch.no_grad()
-       def p_sample(self, xt, t, cond=None, guidance_strength=0, clip_sample=False, ddpm_temperature=1.):
+       def p_sample(self, xt: torch.Tensor, t: torch.Tensor, noise_pred: torch.Tensor, guidance_strength=0, clip_sample=False, ddpm_temperature=1.):
               """
               sample xt-1 from xt, p(xt-1|xt)
-              """
-              noise_pred = self.forward(xt, t, cond)
               
+              Input:
+              xt: noisy samples, here xt is typically the noisy ground truth action
+              t: timestep
+              noise_pred: predicted noise
+              guidance_strength: the strength of the guidance
+              clip_sample: whether to clip the sample to [-1, 1]
+              ddpm_temperature: the temperature of the noise
+              
+              Return: sample xt-1
+              """
               alpha1 = 1 / torch.sqrt(self.alphas[t])
               alpha2 = (1 - self.alphas[t]) / (torch.sqrt(1 - self.alphas_cumprod[t]))
               
@@ -158,12 +196,21 @@ class DDPM_BC(BaseAgent):
        def ddpm_sampler(self, shape, cond=None, guidance_strength=0, clip_sample=False):
               """
               sample x0 from xT, reverse process
+              
+              Input:
+              shape: the desired shape of the sample
+              cond: condition information, here cond is typically the state rather than other condition like language or goal image
+              guidance_strength: the strength of the guidance
+              clip_sample: whether to clip the sample to [-1, 1]
+              
+              Return: sampled x0
               """
               x = torch.randn(shape, device=self.device)
               cond = cond.repeat(x.shape[0], 1)
               
               for t in reversed(range(self.num_timesteps)):
-                     x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device, clip_sample=clip_sample), cond)
+                     noise_pred = self.predict_noise(x, t, cond)
+                     x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device, clip_sample=clip_sample), noise_pred)
               return x
 
        @torch.no_grad()
@@ -233,6 +280,123 @@ class DDPM_BC_latent(DDPM_BC):
               # TODO implement DDIM sampler to accelerate the sampling
               
               
+
+class VLDDPM_BC(DDPM_BC):
+       """
+       this is a vision-language diffusion agent, based on DDPM
+       """
+       def __init__(
+              self, 
+              policy: VisualDiffusion, 
+              schedule: str='cosine',  
+              num_timesteps: int=5,
+              text_encoder: str="t5",
+              device = 'cuda'
+       ):
+              super().__init__(policy, schedule, num_timesteps)
+              
+              self.img_size = self.policy.img_size
+              
+              transform = [
+                     transforms.Resize(256, interpolation=Image.BICUBIC),
+                     transforms.CenterCrop(self.img_size),
+                     transforms.ToTensor()
+              ]
+              
+              self.transform = transforms.Compose(transform)
+              
+              assert text_encoder == 't5'
+              self.lang_encoder = T5Encoder(device=device)
+              print("lang encoder load success")
+              self.device = device
+              
+       def forward(self, images: torch.Tensor, texts: list, action_gt: torch.Tensor, state=None):
+              '''
+              calculate ddpm loss
+              # images: batch of frames of different views, [B, Frame, View, C, H, W]
+              # texts: list of instructions
+              # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
+              # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
+              '''
+              text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
+              loss = self.policy_loss(action_gt, images, text_emb, state)
+              return loss
+       
+       
+       def policy_loss(self, x0: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None):
+              '''
+              calculate ddpm loss
+              Input:
+              x0: [B, D_a] ground truth action
+              imgs: [B, F, V, C, H, W] batch of frames of different views
+              condition: [B, D] batch of instruction embbeding
+              state: [B, D_s] batch of robot arm x,y,z, gripper state
+              
+              return: loss
+              '''
+              batch_size = x0.shape[0]
+              
+              noise = torch.randn_like(x0, device=self.device)
+              t = torch.randint(0, self.num_timesteps, (batch_size, ), device=self.device)
+              xt = self.q_sample(x0, t, noise)
+              
+              noise_pred = self.predict_noise(xt, t, imgs, condition, state)
+              loss = (((noise_pred - noise) ** 2).sum(axis = -1)).mean()
+              
+              return loss
+       
+       
+       def predict_noise(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None):
+              '''
+              calculate ddpm loss
+              
+              Input:
+              xt: [B, D_a] noise action, generated by ground truth action
+              t: [B, 1] time step
+              imgs: [B, F, V, C, H, W] batch of frames of different views
+              condition: [B, D] batch of instruction embbeding
+              state: [B, D_s] batch of robot arm x,y,z, gripper state
+              
+              Return: [B, D_a] predicted noise
+              '''
+              noise_pred = self.policy(xt, t, imgs, condition, state)
+              return noise_pred
+       
+       
+       @torch.no_grad()
+       def ddpm_sampler(self, shape, imgs: torch.Tensor, lang: list, state: torch.Tensor=None, guidance_strength=0, clip_sample=False):
+              """
+              sample x0 from xT, reverse process. Note this ddpm_sampler is different from the original ddpm_sampler as the condition type including both img & lang
+              
+              Input:
+              shape: [num_samples, D_a], desired shapes of samples
+              imgs: [B, F, V, C, H, W] batch of frames of different views
+              lang: list of instructions
+              state: [B, D_s] batch of robot arm x,y,z, gripper state. Do not use this when is None
+              guidance_strength: strength of guidance
+              clip_sample: whether to clip samples to [-1, 1]
+              
+              Return: [num_samples, D_a] samples
+              """
+              x = torch.randn(shape, device=self.device)
+              cond = self.lang_encoder.embed_text(lang)
+              
+              cond = cond.repeat(x.shape[0], 1)
+              imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
+              
+              for t in reversed(range(self.num_timesteps)):
+                     noise_pred = self.predict_noise(x, t, imgs, cond, state)
+                     x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), noise_pred, clip_sample=clip_sample)
+              return x
+       
+
+       @torch.no_grad()
+       def get_action(self, imgs, lang, state=None, num=1, clip_sample=False):
+              if not isinstance(imgs, torch.Tensor):
+                     imgs = self.transform(imgs)
+              
+              return self.ddpm_sampler((num, self.policy.output_dim), imgs, lang, state, clip_sample=clip_sample)
+       
 
 class IDQL_Agent(BaseAgent):
        def __init__(
