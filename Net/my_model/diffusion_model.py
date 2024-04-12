@@ -152,6 +152,7 @@ class VisualDiffusion(nn.Module):
               time_hidden_dim: int=256,
               vision_encoder: str='resnet18',
               vision_pretrained: bool=False,
+              ft_vision: bool=True,
               norm_type: str="bn",
               pooling_type: str='avg',
               ac_fn: str='mish',
@@ -161,6 +162,7 @@ class VisualDiffusion(nn.Module):
               super().__init__()
               self.img_size = img_size
               self.output_dim = output_dim
+              self.ft_vision = ft_vision
               self.cond_dim = cond_dim
               
               # visual encoder
@@ -211,7 +213,11 @@ class VisualDiffusion(nn.Module):
                                     visual_blocks.append(visual_block)
               
               for visual_block, film_layer in zip(visual_blocks, self.film_layer):
-                     image_feature = visual_block(image_feature)
+                     if self.ft_vision:
+                            image_feature = visual_block(image_feature)
+                     else:
+                            with torch.no_grad():
+                                   image_feature = visual_block(image_feature)
                      image_feature = film_layer(condition, image_feature)
               
               # output feature

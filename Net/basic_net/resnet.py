@@ -1,5 +1,5 @@
 import math
-
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -21,7 +21,10 @@ class ResNet(nn.Module):
               *args, **kwargs
        ):
               super().__init__(*args, **kwargs)
-              self.model = timm.create_model(model_name, pretrained=pretrained)
+              pretraine_path = f"{os.path.expanduser('~')}/.cache/huggingface/hub/models--timm--{model_name}.a1_in1k/pytorch_model.bin"
+              self.model = timm.create_model(model_name, 
+                                             pretrained=pretrained,
+                                             pretrained_cfg_overlay=dict(file=pretraine_path))
 
               self.norm_type = norm_type
               assert norm_type in norm_layer

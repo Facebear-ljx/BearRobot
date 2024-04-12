@@ -184,7 +184,7 @@ class RT1Dataset_new():
               transform = [
                      # transforms.Resize(256, interpolation=Image.BICUBIC),
                      transforms.RandomResizedCrop(img_size, scale=(0.75, 1), interpolation=Image.BICUBIC),
-                     transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
+                     transforms.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
                      transforms.ToTensor()
               ]
               
@@ -423,7 +423,7 @@ class AIRKitchenDataset():
               
               transform = [
                      transforms.RandomResizedCrop(img_size, scale=(0.75, 1) ,interpolation=Image.BICUBIC),
-                     transforms.ColorJitter(0.5, 0.5, 0.5, 0.5),
+                     transforms.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
                      transforms.ToTensor()
               ]
               self.transform = transforms.Compose(transform)
