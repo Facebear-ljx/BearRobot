@@ -503,10 +503,37 @@ def VideoPredictDataLoader(
        return rt1dataloader
 
 
+def AIRKitchenDataLoader(
+       datalist: str='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
+       img_size: int=128,
+       frame: int=1,
+       view_list: list=['D435_image', 'wrist_image'],
+       batch_size: int=64,
+       num_workers: int=8,
+       pin_mem: bool=True,
+):
+       dataset = AIRKitchenDataset(datalist=datalist, frames=frame, img_size=img_size, view_list=view_list)
+       
+       num_tasks = ddp.get_world_size()
+       global_rank = ddp.get_rank()
+       sampler = DistributedSampler(
+            dataset, num_replicas=num_tasks, rank=global_rank, shuffle=True
+       )
+       
+       dataloader = DataLoader(
+              dataset, 
+              sampler=sampler,
+              batch_size=batch_size // num_tasks, 
+              num_workers=num_workers,
+              pin_memory=pin_mem,
+              drop_last=True
+       )
+       
+       return dataloader     
+  
+
 def RT1DataLoader(
-       base_dir: str='/data/openxdata_npy',
        datalist: str='/data/openxdata_npy/datalist.json',
-       dataset_name: str='bridge',
        img_size: int=128,
        frames: int=1,
        view_list: list=['image0'],

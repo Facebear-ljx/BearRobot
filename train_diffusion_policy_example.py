@@ -8,7 +8,7 @@ import numpy as np
 from Net.my_model.diffusion_model import VisualDiffusion
 from Agent.ddpm_bc import VLDDPM_BC
 
-from utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader
+from utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader, AIRKitchenDataLoader
 from utils.logger.tb_log import TensorBoardLogger as Logger
 from utils.net.initialization import boolean
 from utils import ddp
@@ -68,7 +68,7 @@ def main(rank: int, world_size: int, args):
        wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
 
        # dataset and dataloader
-       rt1dataloader = RT1DataLoader(
+       rt1dataloader = AIRKitchenDataLoader(
               datalist='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
               img_size=args.img_size,
               frames=args.frames,
