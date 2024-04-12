@@ -29,6 +29,9 @@ def get_args():
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--ft_vision', default=True, type=boolean, help='whether tune the visual encoder')
        
+       parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
+       parser.add_argument('--discretize_actions', default=False, type=boolean, help='whether discretize_actions the action or not')
+       
        parser.add_argument('--num_blocks', default=3, type=int, help='num blocks for decoder MLP')
        parser.add_argument('--hidden_dim', default=256, type=int, help='hidden dim for decoder MLP')
        parser.add_argument('--norm_type', default="bn", type=str, help='normalization type')
@@ -72,6 +75,8 @@ def main(rank: int, world_size: int, args):
               datalist='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
               img_size=args.img_size,
               frames=args.frames,
+              discretize_actions=args.discretize_actions,
+              norm=args.norm,
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
               pin_mem=args.pin_mem,

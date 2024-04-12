@@ -175,11 +175,15 @@ class AIROpenXDataset(Dataset):
 class RT1Dataset_new():
        def __init__(
               self,
-              datalist: str='/home/lijx/ljx/robotics/bearobot/data/bridge/bridge_datalist.json',
+              datalist: str='/home/dodo/ljx/BearRobot/data/bridge/bridge_datalist.json',
               img_size: int=128,
+              norm: str=None,
+              discretize_actions: bool=False,
        ):       
               self.img_size = img_size
               self.datalist = openjson(datalist)
+              self.norm = norm
+              self.discretize_actions = discretize_actions
               
               transform = [
                      # transforms.Resize(256, interpolation=Image.BICUBIC),
@@ -190,7 +194,19 @@ class RT1Dataset_new():
               
               self.transform = transforms.Compose(transform)        
               
-              self.action_keys = ["world_vector", "rotation_delta", "open_gripper"]   
+              self.action_keys = ["world_vector", "rotation_delta", "open_gripper"]  
+              self._statistics() 
+       
+       
+       def _statistics(self):
+              all_action = [torch.cat([torch.tensor(data['label'][key], dtype=torch.float32).view(-1) for key in self.action_keys]).view(1, -1) for data in self.datalist]
+              actions = torch.cat(all_action)
+              
+              self.a_max = actions.max(0)[0]
+              self.a_min = actions.min(0)[0]
+              self.a_mean = actions.mean(0)
+              self.a_std = actions.std(0)
+       
        
        def discretize(self, tensor, num_bins, min_val, max_val):
               """
@@ -212,8 +228,14 @@ class RT1Dataset_new():
               
               # discretize the action
               action = torch.cat([torch.tensor(action[key], dtype=torch.float32).view(-1) for key in self.action_keys])
-              action[:6] = self.discretize(action[:6], 256, -1., 1.)
-              action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)
+              if self.discretize_actions:
+                     action[:6] = self.discretize(action[:6], 256, -1., 1.)
+                     action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)
+              else:
+                     if self.norm == 'mean':
+                            action = (action - self.a_mean) / self.a_std
+                     elif self.norm == 'minmax':
+                            action = (action - self.a_min) / (self.a_max - self.a_min) * 2 - 1
               
               # images
               # [image t+2, image t+1, image t] -> [image t, image t+1, image t+2]
@@ -558,13 +580,17 @@ def RT1DataLoader(
        datalist: str='/data/openxdata_npy/datalist.json',
        img_size: int=128,
        frames: int=1,
+       norm: str="minmax",
+       discretize_actions: bool=False,
        view_list: list=['image0'],
        batch_size: int=64,
        num_workers: int=8,
        pin_mem: bool=True,
 ):
        rt1dataset = RT1Dataset_new(datalist=datalist,
-                                   img_size=img_size)
+                                   img_size=img_size,
+                                   norm=norm,
+                                   discretize_actions=discretize_actions)
 
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()
