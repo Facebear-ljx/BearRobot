@@ -548,7 +548,7 @@ def VideoPredictDataLoader(
 def AIRKitchenDataLoader(
        datalist: str='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
        img_size: int=128,
-       frame: int=1,
+       frames: int=1,
        view_list: list=['D435_image', 'wrist_image'],
        norm: str="minmax",
        discretize_actions: bool=False,
@@ -556,7 +556,7 @@ def AIRKitchenDataLoader(
        num_workers: int=8,
        pin_mem: bool=True,
 ):
-       dataset = AIRKitchenDataset(datalist=datalist, frames=frame, img_size=img_size, view_list=view_list, discretize_actions=discretize_actions, norm=norm)
+       dataset = AIRKitchenDataset(datalist=datalist, frames=frames, img_size=img_size, view_list=view_list, discretize_actions=discretize_actions, norm=norm)
        
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()
