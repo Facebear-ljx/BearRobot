@@ -13,7 +13,7 @@ def basic_args():
        parser.add_argument('--steps', default=int(1e+6), type=float, help='train steps')
        parser.add_argument('--val_freq', default=int(5e+3), type=float, help='val frequency')
        parser.add_argument("--seed", default=42, type=int)  # Sets PyTorch and Numpy seeds
-       parser.add_argument('--batch_size', default=64, type=int)
+       parser.add_argument('--batch_size', default=16, type=int)
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
        
        # save log parameters

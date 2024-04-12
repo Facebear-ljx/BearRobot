@@ -143,6 +143,7 @@ class VisualDiffusion(nn.Module):
        def __init__(
               self, 
               img_size: int=224,  # a dim
+              view_num: int=2,
               output_dim: int=7,  # a dim
               cond_dim: int=768,  # s dim, if condition on s
               hidden_dim: int=256,
@@ -185,7 +186,7 @@ class VisualDiffusion(nn.Module):
                             idx += 1
               
               # decoder
-              self.decoder = MLPResNet(num_blocks, self.visual_dim + time_hidden_dim + output_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
+              self.decoder = MLPResNet(num_blocks, self.visual_dim * view_num + time_hidden_dim + output_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
               
               self.device = device      
 
@@ -216,7 +217,7 @@ class VisualDiffusion(nn.Module):
               # output feature
               image_feature = self.visual_encoder.model.global_pool(image_feature)
               image_feature = self.visual_encoder.model.fc(image_feature)
-              return image_feature
+              return image_feature.view(B, F * V * self.visual_dim)
  
        
        def forward(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, cond: list=None, state=None):

@@ -30,7 +30,7 @@ class ResNet(nn.Module):
               assert pooling_type in pooling_layer
               self.pooling_layer = pooling_layer[pooling_type]
               
-              if norm_type is not "bn":
+              if norm_type != "bn":
                      self._replace_bn()
 
               del self.model.fc

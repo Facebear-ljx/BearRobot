@@ -25,7 +25,8 @@ def get_args():
        # customize your argparser
        parser.add_argument('--img_size', default=224, type=int, help='image size')
        parser.add_argument('--frames', default=1, type=int, help='frames num input to the visual encoder')
-       parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
+       parser.add_argument('--visual_encoder', default='resnet34', type=str, help='visual encoder backbone, support resnet 18/34/50')
+       parser.add_argument('--visual_pretrain', default=False, type=boolean, help='whether use visual pretrain')
        
        parser.add_argument('--num_blocks', default=3, type=int, help='num blocks for decoder MLP')
        parser.add_argument('--hidden_dim', default=256, type=int, help='hidden dim for decoder MLP')
@@ -76,16 +77,19 @@ def main(rank: int, world_size: int, args):
        )
 
        # agent and the model for agent
-       visual_diffusion_policy = VisualDiffusion(img_size=args.img_size, 
+       visual_diffusion_policy = VisualDiffusion(img_size=args.img_size,
+                                                 view_num=2, 
                                                  output_dim=7,
                                                  num_blocks=args.num_blocks,
                                                  hidden_dim=args.hidden_dim,
                                                  time_embeding=args.time_embed,
                                                  time_dim=args.time_dim,
                                                  time_hidden_dim=args.time_hidden_dim,
+                                                 vision_encoder=args.visual_encoder,
+                                                 vision_pretrained=args.visual_pretrain,
                                                  norm_type=args.norm_type,
                                                  pooling_type=args.pooling_type,
-                                                 device=rank, vision_pretrain=args.visual_pretrain).to(rank)
+                                                 device=rank).to(rank)
        agent = VLDDPM_BC(policy=visual_diffusion_policy,
                          schedule=args.beta,
                          num_timesteps=args.T,
