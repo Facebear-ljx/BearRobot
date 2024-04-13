@@ -26,9 +26,10 @@ def get_args():
        parser.add_argument('--img_size', default=224, type=int, help='image size')
        parser.add_argument('--frames', default=1, type=int, help='frames num input to the visual encoder')
        parser.add_argument('--visual_encoder', default='resnet34', type=str, help='visual encoder backbone, support resnet 18/34/50')
-       parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
-       parser.add_argument('--ft_vision', default=True, type=boolean, help='whether tune the visual encoder')
+       parser.add_argument('--visual_pretrain', default=False, type=boolean, help='whether use visual pretrain')
+       parser.add_argument('--ft_vision', default=False, type=boolean, help='whether tune the visual encoder')
        
+       parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
        parser.add_argument('--discretize_actions', default=False, type=boolean, help='whether discretize_actions the action or not')
        
@@ -80,12 +81,13 @@ def main(rank: int, world_size: int, args):
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
               pin_mem=args.pin_mem,
+              ac_num=4,
        )
 
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion(img_size=args.img_size,
                                                  view_num=2, 
-                                                 output_dim=7,
+                                                 output_dim=int(7 * args.ac_num),
                                                  num_blocks=args.num_blocks,
                                                  hidden_dim=args.hidden_dim,
                                                  time_embeding=args.time_embed,

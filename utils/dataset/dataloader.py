@@ -432,18 +432,20 @@ class VPDataset(AIROpenXDataset):
 class AIRKitchenDataset():
        def __init__(
               self,
-              datalist='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
+              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json',
               img_size: int=128,
               frames: int=3,
               view_list: list=['D435_image', 'wrist_image'],
               norm: str=None,
               discretize_actions: bool=False,
+              ac_num: int=4,
        ):
               self.img_size = img_size
               self.frames = frames
               self.view_list = view_list
               self.discretize_actions = discretize_actions
               self.norm = norm
+              self.ac_num = ac_num
               
               self.datalist = openjson(datalist)
               self._statistics()
@@ -456,7 +458,7 @@ class AIRKitchenDataset():
               self.transform = transforms.Compose(transform)
 
        def _statistics(self):
-              all_action = [torch.tensor(data['action']).view(1, -1) for data in self.datalist]
+              all_action = [torch.tensor(data['action'][0]).view(1, -1) for data in self.datalist]
               actions = torch.cat(all_action)
               
               self.a_max = actions.max(0)[0]
@@ -481,19 +483,23 @@ class AIRKitchenDataset():
               step = self.datalist[idx]
               
               imgs_path = [step[f'{view}'] for view in self.view_list]
-              action = step['action']
+              actions = step['action'][:self.ac_num]
               lang = step['instruction']
               
-              # discretize the action
-              action = torch.tensor(action)
-              if self.discretize_actions:
-                     action[:6] = self.discretize(action[:6], 256, -1., 1.)
-                     action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)
-              else:
-                     if self.norm == 'mean':
-                            action = (action - self.a_mean) / self.a_std
-                     elif self.norm == 'minmax':
-                            action = (action - self.a_min) / (self.a_max - self.a_min) * 2 - 1
+              processed_action = []
+              for action in actions:
+                     # discretize the action
+                     action = torch.tensor(action)
+                     if self.discretize_actions:
+                            action[:6] = self.discretize(action[:6], 256, -1., 1.)
+                            action[-1] = torch.tensor(255) if action[-1] == 1. else torch.tensor(0)
+                     else:
+                            if self.norm == 'mean':
+                                   action = (action - self.a_mean) / self.a_std
+                            elif self.norm == 'minmax':
+                                   action = (action - self.a_min) / (self.a_max - self.a_min) * 2 - 1
+                     processed_action.append(action)
+              action = torch.cat(processed_action, dim=-1)
                             
               # images
               images = [openimage(img_path) for img_path in imgs_path]
@@ -555,8 +561,15 @@ def AIRKitchenDataLoader(
        batch_size: int=64,
        num_workers: int=8,
        pin_mem: bool=True,
+       ac_num: int=4,
 ):
-       dataset = AIRKitchenDataset(datalist=datalist, frames=frames, img_size=img_size, view_list=view_list, discretize_actions=discretize_actions, norm=norm)
+       dataset = AIRKitchenDataset(datalist=datalist, 
+                                   frames=frames, 
+                                   img_size=img_size, 
+                                   view_list=view_list, 
+                                   discretize_actions=discretize_actions, 
+                                   norm=norm,
+                                   ac_num=ac_num)
        
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()

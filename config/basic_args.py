@@ -40,8 +40,8 @@ def basic_args():
 def diffusion_args(parser: argparse.ArgumentParser):
        parser.add_argument('--beta', default='vp', type=str, help='noise schedule')
        parser.add_argument('--time_embed', default='learned', type=str, help='learned or fixed type time embedding')
-       parser.add_argument('--T', default=15, type=float, help='diffusion max time step')
-       parser.add_argument('--time_dim', default=32, type=float, help='time fourier feature dim')
-       parser.add_argument('--time_hidden_dim', default=256, type=float, help='time fourier feature hidden dim')
+       parser.add_argument('--T', default=15, type=int, help='diffusion max time step')
+       parser.add_argument('--time_dim', default=32, type=int, help='time fourier feature dim')
+       parser.add_argument('--time_hidden_dim', default=256, type=int, help='time fourier feature hidden dim')
        parser.add_argument('--sampler', default='ddpm', type=str, help='sampler, ddpm or ddim')
        return parser
