@@ -68,7 +68,7 @@ def main(rank: int, world_size: int, args):
        
        # init ddp
        if args.ddp:
-              global_rank, rank, _ = ddp.ddp_setup(rank, world_size, True, args.port)
+              global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
        else:
               global_rank = 0
               print(f"do not use ddp, train on GPU {rank}")
@@ -129,9 +129,4 @@ def main(rank: int, world_size: int, args):
 if __name__ == '__main__':
        # get log
        args = get_args()
-       device = torch.device(args.device)
-
-       if args.ddp:
-              mp.spawn(main, args=(args.world_size, args), nprocs=args.world_size)
-       else:
-              main(0, 1, args)
+       main(args)

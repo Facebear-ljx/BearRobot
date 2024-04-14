@@ -5,6 +5,41 @@ from torch.distributed import init_process_group, destroy_process_group
 import subprocess
 
 
+def ddp_setup_universal(verbose=False, args=None):
+       if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
+              rank = int(os.environ["RANK"])
+              world_size = int(os.environ['WORLD_SIZE'])
+              gpu = int(os.environ['LOCAL_RANK'])
+              os.environ['MASTER_PORT'] = str(getattr(args, 'port', '29529'))
+              os.environ["MASTER_ADDR"] = "localhost"
+       elif 'SLURM_PROCID' in os.environ:
+              rank = int(os.environ['SLURM_PROCID'])
+              gpu = rank % torch.cuda.device_count()
+              world_size = int(os.environ['SLURM_NTASKS'])
+              node_list = os.environ['SLURM_NODELIST']
+              num_gpus = torch.cuda.device_count()
+              addr = subprocess.getoutput(f'scontrol show hostname {node_list} | head -n1')
+              os.environ['MASTER_PORT'] = str(args.port)
+              os.environ['MASTER_ADDR'] = addr
+       else:
+              print("Not using DDP mode")
+              return 0, 0, 1
+
+       os.environ['WORLD_SIZE'] = str(world_size)
+       os.environ['LOCAL_RANK'] = str(gpu)
+       os.environ['RANK'] = str(rank)              
+
+       torch.cuda.set_device(gpu)
+       dist_backend = 'nccl'
+       dist_url = "env://"
+       print('| distributed init (rank {}): {}, gpu {}'.format(rank, dist_url, gpu), flush=True)
+       init_process_group(backend=dist_backend, world_size=world_size, rank=rank)
+       torch.distributed.barrier()
+       if verbose:
+              setup_for_distributed(rank == 0)
+       return rank, gpu, world_size
+      
+
 def ddp_setup(rank: int, world_size: int, verbose: bool=False, port: str="12355"):
        """
        Args:

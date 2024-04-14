@@ -61,7 +61,7 @@ def main(rank: int, world_size: int, args):
       
        # init ddp
        if args.ddp:
-              global_rank, rank, _ = ddp.ddp_setup(rank, world_size, True, args.port)
+              global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
        else:
               global_rank = 0
               print(f"do not use ddp, train on GPU {rank}")
