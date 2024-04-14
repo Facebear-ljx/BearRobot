@@ -6,6 +6,10 @@ import subprocess
 
 
 def ddp_setup_universal(verbose=False, args=None):
+       if args.ddp == False:
+              print(f"do not use ddp, train on GPU 0")
+              return 0, 0, 1
+       
        if 'RANK' in os.environ and 'WORLD_SIZE' in os.environ:
               rank = int(os.environ["RANK"])
               world_size = int(os.environ['WORLD_SIZE'])

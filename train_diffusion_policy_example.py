@@ -53,11 +53,7 @@ def main(args):
        torch.backends.cudnn.deterministic = True
        
        # init ddp
-       if args.ddp:
-              global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
-       else:
-              global_rank = 0
-              print(f"do not use ddp, train on GPU {rank}")
+       global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
        
        # save 
        if args.save and global_rank==0:
