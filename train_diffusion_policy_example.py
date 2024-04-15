@@ -68,8 +68,11 @@ def main(args):
        wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
 
        # dataset and dataloader
+       view_list = ['D435_image', 'wrist_image']
        rt1dataloader = AIRKitchenDataLoader(
+              base_dir='',
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json',
+              view_list=view_list,
               img_size=args.img_size,
               frames=args.frames,
               discretize_actions=args.discretize_actions,
@@ -82,7 +85,7 @@ def main(args):
 
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion(img_size=args.img_size,
-                                                 view_num=2, 
+                                                 view_num=len(view_list), 
                                                  output_dim=int(7 * args.ac_num),
                                                  num_blocks=args.num_blocks,
                                                  hidden_dim=args.hidden_dim,

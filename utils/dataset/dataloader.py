@@ -432,6 +432,7 @@ class VPDataset(AIROpenXDataset):
 class AIRKitchenDataset():
        def __init__(
               self,
+              base_dir='',
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json',
               img_size: int=128,
               frames: int=3,
@@ -440,6 +441,7 @@ class AIRKitchenDataset():
               discretize_actions: bool=False,
               ac_num: int=4,
        ):
+              self.base_dir = base_dir
               self.img_size = img_size
               self.frames = frames
               self.view_list = view_list
@@ -482,7 +484,7 @@ class AIRKitchenDataset():
        def __getitem__(self, idx):
               step = self.datalist[idx]
               
-              imgs_path = [step[f'{view}'] for view in self.view_list]
+              imgs_path = [os.path.join(self.base_dir, step[f'{view}']) for view in self.view_list]
               actions = step['action'][:self.ac_num]
               lang = step['instruction']
               
@@ -552,6 +554,7 @@ def VideoPredictDataLoader(
 
 
 def AIRKitchenDataLoader(
+       base_dir: str='',
        datalist: str='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
        img_size: int=128,
        frames: int=1,
@@ -563,7 +566,8 @@ def AIRKitchenDataLoader(
        pin_mem: bool=True,
        ac_num: int=4,
 ):
-       dataset = AIRKitchenDataset(datalist=datalist, 
+       dataset = AIRKitchenDataset(base_dir=base_dir,
+                                   datalist=datalist, 
                                    frames=frames, 
                                    img_size=img_size, 
                                    view_list=view_list, 
