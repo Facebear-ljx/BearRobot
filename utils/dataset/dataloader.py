@@ -590,7 +590,11 @@ def AIRKitchenDataLoader(
               drop_last=True
        )
        
-       return dataloader     
+       statistics = {"a_min": dataset.a_min.cpu().numpy().tolist(),
+                     "a_max": dataset.a_max.cpu().numpy().tolist(),
+                     "a_mean": dataset.a_mean.cpu().numpy().tolist(),
+                     "a_std": dataset.a_std.cpu().numpy().tolist()}
+       return dataloader, statistics
   
 
 def RT1DataLoader(
