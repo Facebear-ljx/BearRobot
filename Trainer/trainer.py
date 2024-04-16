@@ -16,12 +16,14 @@ from utils.evaluation.base_eval import BaseEval
 from utils.logger.base_log import BaseLogger
 from Agent.base_agent import BaseAgent
 from torch.utils.data import DataLoader
+from Trainer.lr_schedule import CosineAnnealingWarmUpRestarts
 
 
 OPTIMIZER = {"adam": torch.optim.Adam,
              "adamw": torch.optim.AdamW}
 
-LR_SCHEDULE = {"cosine": torch.optim.lr_scheduler.CosineAnnealingLR}
+LR_SCHEDULE = {"cosine": torch.optim.lr_scheduler.CosineAnnealingLR,
+               "cosinewarm": CosineAnnealingWarmUpRestarts}
 
 
 class BCTrainer:
@@ -63,7 +65,7 @@ class BCTrainer:
               self.val_dataloader = val_dataloader
               
               # learning rate schedule
-              self.scheduler = LR_SCHEDULE['cosine'](self.optimizer, num_steps, eta_min=1e-6)
+              self.scheduler = LR_SCHEDULE['cosinewarm'](self.optimizer, num_steps, eta_min=1e-6)
               
               # logger
               self.logger = logger
@@ -230,7 +232,7 @@ class BCTrainer:
               with io.BytesIO() as f:
                      torch.save(save_model, f)
                      fileio.put(f.getvalue(), f"{self.save_path}/{step}_{loss}.pth")
-                     # fileio.put(f.getvalue(), f"{self.save_path}/latest.pth")
+                     fileio.put(f.getvalue(), f"{self.save_path}/latest.pth")
               
        def load_model(self, path: str):
               """
