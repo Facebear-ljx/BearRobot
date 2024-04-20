@@ -99,6 +99,7 @@ class BCTrainer:
               self.agent.train()
               for epoch in range(0, epochs):
                      epoch_loss = 0.
+                     self.train_dataloader.sampler.set_epoch(epoch)
                      with tqdm(self.train_dataloader, unit="batch") as pbar:
                             for batch in pbar:
                                    imgs = batch['imgs'].to(self.device)
@@ -137,6 +138,8 @@ class BCTrainer:
               steps = self.num_steps
               self.agent.train()
               
+              epoch = 0
+              self.train_dataloader.sampler.set_epoch(epoch)
               iterator = iter(self.train_dataloader)
               with tqdm(range(self.init_step, steps)) as pbar:
                      for step in pbar:
@@ -145,6 +148,8 @@ class BCTrainer:
                             try:
                                    batch = next(iterator)
                             except:
+                                   epoch += 1
+                                   self.train_dataloader.sampler.set_epoch(epoch)
                                    iterator = iter(self.train_dataloader)
                                    batch = next(iterator)
                             
