@@ -155,6 +155,7 @@ class VisualDiffusion(nn.Module):
               ft_vision: bool=True,
               norm_type: str="bn",
               pooling_type: str='avg',
+              add_spatial_coordinates: bool=False,
               ac_fn: str='mish',
               time_embeding: str='learned',
               device: str='cpu',
@@ -167,7 +168,7 @@ class VisualDiffusion(nn.Module):
               
               # visual encoder
               assert vision_encoder in visual_dim
-              self.visual_encoder = ResNet(vision_encoder, pretrained=vision_pretrained, norm_type=norm_type, pooling_type=pooling_type)
+              self.visual_encoder = ResNet(vision_encoder, pretrained=vision_pretrained, norm_type=norm_type, pooling_type=pooling_type, add_spatial_coordinates=add_spatial_coordinates)
               self.visual_dim = visual_dim[vision_encoder]
               
               # time embedding

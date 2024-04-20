@@ -18,6 +18,8 @@ class ResNet(nn.Module):
               pretrained: bool = False,
               norm_type: str = "bn",
               pooling_type: str = "avg",
+              add_spatial_coordinates: bool = False,
+              use_alpha_channel: bool = False,
               *args, **kwargs
        ):
               super().__init__(*args, **kwargs)
@@ -39,11 +41,29 @@ class ResNet(nn.Module):
               del self.model.fc
               self.model.fc = nn.Identity()
               
+              # add spatial information to the image
+              self.add_spatial_coordinates = add_spatial_coordinates
+              self.use_alpha_channel = use_alpha_channel
+              self.c_num = 3
+              if self.add_spatial_coordinates:
+                     self.spatial_coordinates = AddSpatialCoordinates(dtype=self.model.conv1.weight.dtype)
+                     self.c_num += 2
+              
+              if self.use_alpha_channel:
+                     self.c_num += 1
+              
+              if self.c_num > 3:
+                     self.model.conv1 = nn.Conv2d(self.c_num, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+              
        def forward(self, img):
+              if self.add_spatial_coordinates:
+                     img = self.spatial_coordinates(img)
               output = self.model(img)
               return output
        
        def stem(self, img):
+              if self.add_spatial_coordinates:
+                     img = self.spatial_coordinates(img)
               output = self.model.conv1(img)
               output = self.model.bn1(output)
               output = self.model.act1(output)
@@ -74,7 +94,29 @@ class ResNet(nn.Module):
               bn_list = [k.split('.') for k, m in self.model.named_modules() if isinstance(m, nn.BatchNorm2d)]
               assert len(bn_list) == 0
               
-              
+
+class AddSpatialCoordinates(nn.Module):
+    def __init__(self, dtype=torch.float32):
+        super(AddSpatialCoordinates, self).__init__()
+        self.dtype = dtype
+
+    def forward(self, x):
+        grids = [
+            torch.linspace(-1, 1, steps=s, device=x.device, dtype=self.dtype) 
+            for s in x.shape[-2:]  # add spatial coordinates with HxW shape
+        ]
+
+        grid = torch.meshgrid(grids, indexing='ij')
+        grid = torch.stack(grid, dim=0)
+        
+        # reshape to B*F*V, 2, H, W
+        BFV, *_ = x.shape
+        grid = grid.expand(BFV, *grid.shape)
+
+        # cat on the channels dimension
+        return torch.cat([x, grid], dim=-3)
+
+   
               
 if __name__ == '__main__':
        timmresnet = ResNet(model_name="resnet50", norm_type="gn")

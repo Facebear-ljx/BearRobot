@@ -37,6 +37,7 @@ def get_args():
        parser.add_argument('--hidden_dim', default=256, type=int, help='hidden dim for decoder MLP')
        parser.add_argument('--norm_type', default="bn", type=str, help='normalization type')
        parser.add_argument('--pooling_type', default="avg", type=str, help='pooling type')
+       parser.add_argument('--add_spatial_coordinates', default=False, type=boolean, help='add spatial coordinates to the image')
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    
@@ -97,6 +98,7 @@ def main(args):
                                                  ft_vision=args.ft_vision,
                                                  norm_type=args.norm_type,
                                                  pooling_type=args.pooling_type,
+                                                 add_spatial_coordinates=args.add_spatial_coordinates,
                                                  device=rank).to(rank)
        agent = VLDDPM_BC(policy=visual_diffusion_policy,
                          schedule=args.beta,
