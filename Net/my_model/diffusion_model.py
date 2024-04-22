@@ -158,8 +158,30 @@ class VisualDiffusion(nn.Module):
               add_spatial_coordinates: bool=False,
               ac_fn: str='mish',
               time_embeding: str='learned',
+              film_fusion: bool=False,
               device: str='cpu',
        ):
+              """this is a vision-language diffusion model for robotics control
+
+              Args:
+                  img_size (int, optional): input image size. Defaults to 224.
+                  output_dim (int, optional): the action dim. Defaults to 7.
+                  cond_dim (int, optional): the conditional (language embed) information dim. Defaults to 256.
+                  hidden_dim (int, optional): decoder hidden dim. Defaults to 256.
+                  num_blocks (int, optional): decoder block num. Defaults to 3.
+                  time_dim (int, optional): time embedding dim. Defaults to 32.
+                  time_hidden_dim (int, optional): time encoder dim. Defaults to 256.
+                  vision_encoder (str, optional): vision backbone name. Defaults to 'resnet18'.
+                  vision_pretrained (bool, optional): load pretrained vision backbone. Defaults to False.
+                  ft_vision (bool, optional): train the vision backbone. Defaults to True.
+                  norm_type (str, optional): vision backbone norm type. Defaults to "bn".
+                  pooling_type (str, optional): vision backbone pooling type. Defaults to 'avg'.
+                  add_spatial_coordinates (bool, optional): add spatial coordinates to the image. Defaults to False.
+                  ac_fn (str, optional): decoder activation. Defaults to 'mish'.
+                  time_embeding (str, optional): learned or fixed time embedding. Defaults to 'learned'.
+                  film_fusion (bool, optional): use film fusion for decoder. Defaults to False.
+                  device (str, optional): cpu or cuda. Defaults to 'cpu'.
+              """              
               super().__init__()
               self.img_size = img_size
               self.output_dim = output_dim
