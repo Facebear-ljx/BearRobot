@@ -478,15 +478,15 @@ class AIRKitchenDataset():
                      self.s_mean = states.mean(0)
                      self.s_std = states.std(0)                     
               else:
-                     self.a_max = statistics['a_max']
-                     self.a_min = statistics['a_min']
-                     self.a_mean = statistics['a_mean']
-                     self.a_std = statistics['a_std']
+                     self.a_max = torch.tensor(statistics['a_max'])
+                     self.a_min = torch.tensor(statistics['a_min'])
+                     self.a_mean = torch.tensor(statistics['a_mean'])
+                     self.a_std = torch.tensor(statistics['a_std'])
 
-                     self.s_max = statistics['s_max']
-                     self.s_min = statistics['s_min']
-                     self.s_mean = statistics['s_mean']
-                     self.s_std = statistics['s_std']                     
+                     self.s_max = torch.tensor(statistics['s_max'])
+                     self.s_min = torch.tensor(statistics['s_min'])
+                     self.s_mean = torch.tensor(statistics['s_mean'])
+                     self.s_std = torch.tensor(statistics['s_std'])                     
               
        
        def discretize(self, tensor, num_bins, min_val, max_val):
