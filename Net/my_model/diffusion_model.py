@@ -188,8 +188,13 @@ class VisualDiffusion(nn.Module):
                             self.film_layer.extend([FiLM_layer(cond_dim, feature_dim) for _ in range(feature_depth)])
                             idx += 1
               
+              # state action encoder
+              self.state_encoder = MLP(7, [hidden_dim], hidden_dim)
+              self.action_encoder = MLP(output_dim, [hidden_dim], hidden_dim)
+
               # decoder
-              self.decoder = MLPResNet(num_blocks, self.visual_dim * view_num + time_hidden_dim + output_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
+              input_dim = self.visual_dim * view_num + time_hidden_dim + hidden_dim * 2
+              self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
               
               self.device = device      
 
@@ -245,6 +250,9 @@ class VisualDiffusion(nn.Module):
               """
               # flatted xt
               xt = xt.reshape([xt.shape[0], -1])
+              state = state.reshape([state.shape[0], -1])
+              xt_feature = self.action_encoder(xt)
+              s_feature = self.state_encoder(state)
               
               # encode
               if not isinstance(t, torch.Tensor):
@@ -256,7 +264,7 @@ class VisualDiffusion(nn.Module):
               else:
                      raise NotImplementedError(f"cond must be given, not None")
               
-              input_feature = torch.concat([image_feature, time_embedding, xt], dim=-1)
+              input_feature = torch.concat([image_feature, time_embedding, xt_feature, s_feature], dim=-1)
               
               # decode
               noise_pred = self.decoder(input_feature)

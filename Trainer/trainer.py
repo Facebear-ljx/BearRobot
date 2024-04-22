@@ -90,6 +90,9 @@ class BCTrainer:
               self.num_steps = num_steps
               if args.ddp:
                      torch.distributed.barrier()
+
+              n_parameters = sum(p.numel() for p in agent.parameters() if p.requires_grad)
+              print("number of trainable parameters: %.2fM" % (n_parameters/1e6,))
               
        def train_epoch(self):
               """
@@ -156,11 +159,12 @@ class BCTrainer:
                             t1 = time.time()
                             imgs = batch['imgs'].to(self.device)
                             label = batch['label'].to(self.device)
+                            proprio = batch['proprio'].to(self.device)
                             lang = batch['lang']
                             
                             # one gradient step
                             self.optimizer.zero_grad()
-                            loss = self.agent(imgs, lang, label)
+                            loss = self.agent(imgs, lang, label, proprio)
                             loss.backward()
                             self.optimizer.step()
                             t2 = time.time()
@@ -202,7 +206,8 @@ class BCTrainer:
                                    imgs = batch['imgs'].to(self.device)
                                    a = batch['label'].to(self.device)
                                    lang = batch['lang']
-                                   loss = self.agent(imgs, lang, a)
+                                   proprio = batch['proprio'].to(self.device)
+                                   loss = self.agent(imgs, lang, a, proprio)
                                    
                                    pbar.set_description(f"Step {step} val Loss: {loss.item():.4f}")
                                    val_loss += loss.item()
