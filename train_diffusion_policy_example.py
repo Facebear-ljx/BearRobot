@@ -39,6 +39,8 @@ def get_args():
        parser.add_argument('--norm_type', default="bn", type=str, help='normalization type')
        parser.add_argument('--pooling_type', default="avg", type=str, help='pooling type')
        parser.add_argument('--add_spatial_coordinates', default=False, type=boolean, help='add spatial coordinates to the image')
+       parser.add_argument('--film_fusion', default=False, type=boolean, help='add film condition to the decoder')
+       
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    
@@ -73,7 +75,7 @@ def main(args):
        view_list = ['D435_image', 'wrist_image']
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='',
-              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json',
+              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac-blur.json',
               view_list=view_list,
               img_size=args.img_size,
               frames=args.frames,
@@ -132,6 +134,7 @@ def main(args):
                                                  norm_type=args.norm_type,
                                                  pooling_type=args.pooling_type,
                                                  add_spatial_coordinates=args.add_spatial_coordinates,
+                                                 film_fusion=args.film_fusion,
                                                  device=rank).to(rank)
        agent = VLDDPM_BC(policy=visual_diffusion_policy,
                          schedule=args.beta,

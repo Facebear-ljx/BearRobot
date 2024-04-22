@@ -210,13 +210,28 @@ class VisualDiffusion(nn.Module):
                             self.film_layer.extend([FiLM_layer(cond_dim, feature_dim) for _ in range(feature_depth)])
                             idx += 1
               
-              # state action encoder
-              self.state_encoder = MLP(7, [hidden_dim], hidden_dim)
-              self.action_encoder = MLP(output_dim, [hidden_dim], hidden_dim)
+              # state encoder
+              self.film_fusion = film_fusion
+              self.state_encoder = MLP(7, [hidden_dim], hidden_dim)  # HARD CODE
+              if self.film_fusion:
+                     # add image, state, time embedding as film condition to action decoder
+                     input_dim = output_dim
+                     self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
+                     
+                     cond_dim = self.visual_dim * view_num + time_hidden_dim + hidden_dim
+                     self.film_fusion_layer = nn.ModuleList()
+                     for name, child in self.decoder.named_children():
+                            if isinstance(child, nn.ModuleList):
+                                   for block in child:
+                                          feature_dim = block.hidden_dim
+                                          self.film_fusion_layer.append(FiLM_layer(cond_dim, feature_dim))
+              else:
+                     # simplay concat image, state, time embedding and action as input to action decoder
+                     self.action_encoder = MLP(output_dim, [hidden_dim], hidden_dim)
 
-              # decoder
-              input_dim = self.visual_dim * view_num + time_hidden_dim + hidden_dim * 2
-              self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
+                     # decoder
+                     input_dim = self.visual_dim * view_num + time_hidden_dim + hidden_dim * 2
+                     self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
               
               self.device = device      
 
@@ -273,7 +288,6 @@ class VisualDiffusion(nn.Module):
               # flatted xt
               xt = xt.reshape([xt.shape[0], -1])
               state = state.reshape([state.shape[0], -1])
-              xt_feature = self.action_encoder(xt)
               s_feature = self.state_encoder(state)
               
               # encode
@@ -286,10 +300,20 @@ class VisualDiffusion(nn.Module):
               else:
                      raise NotImplementedError(f"cond must be given, not None")
               
-              input_feature = torch.concat([image_feature, time_embedding, xt_feature, s_feature], dim=-1)
-              
-              # decode
-              noise_pred = self.decoder(input_feature)
+              if self.film_fusion:
+                     output = self.decoder.dense1(xt)
+                     condition = torch.concat([image_feature, time_embedding, s_feature], dim=-1)
+                     for block, film_layer in zip(self.decoder.mlp_res_blocks, self.film_fusion_layer):
+                            output = block(output)
+                            output = film_layer(condition, output)
+                     noise_pred = self.decoder.dense2(self.decoder.ac_fn(output))
+                     return noise_pred
+              else:
+                     xt_feature = self.action_encoder(xt)
+                     input_feature = torch.concat([image_feature, time_embedding, xt_feature, s_feature], dim=-1)
+                     
+                     # decode
+                     noise_pred = self.decoder(input_feature)
               return noise_pred  
 
 

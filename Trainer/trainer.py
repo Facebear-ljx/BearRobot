@@ -209,7 +209,8 @@ class BCTrainer:
                                    proprio = batch['proprio'].to(self.device)
                                    loss = self.agent(imgs, lang, a, proprio)
                                    
-                                   pbar.set_description(f"Step {step} val Loss: {loss.item():.4f}")
+                                   if self.global_rank == 0:
+                                          pbar.set_description(f"Step {step} val Loss: {loss.item():.4f}")
                                    val_loss += loss.item()
               
               avg_loss = val_loss / len(self.val_dataloader)

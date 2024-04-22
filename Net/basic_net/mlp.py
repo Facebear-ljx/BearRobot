@@ -61,6 +61,7 @@ class MLPResNetBlock(nn.Module):
        """
        def __init__(self, hidden_dim:int, ac_fn='relu', use_layernorm=False, dropout_rate=0.1):
               super(MLPResNetBlock, self).__init__()
+              self.hidden_dim = hidden_dim
               self.use_layernorm = use_layernorm
               self.dropout = nn.Dropout(dropout_rate)
               self.norm1 = nn.LayerNorm(hidden_dim)
