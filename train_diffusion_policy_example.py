@@ -8,7 +8,7 @@ import numpy as np
 from Net.my_model.diffusion_model import VisualDiffusion
 from Agent.ddpm_bc import VLDDPM_BC
 
-from utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader, AIRKitchenDataLoader
+from utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader, AIRKitchenDataLoader, AIRKitchenValDataLoader
 from utils.logger.tb_log import TensorBoardLogger as Logger
 from utils.net.initialization import boolean
 from utils import ddp
@@ -18,6 +18,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 
 import torch.multiprocessing as mp
 import argparse
+import json
 
 
 def get_args():
@@ -70,7 +71,7 @@ def main(args):
 
        # dataset and dataloader
        view_list = ['D435_image', 'wrist_image']
-       rt1dataloader = AIRKitchenDataLoader(
+       rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='',
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json',
               view_list=view_list,
@@ -83,6 +84,38 @@ def main(args):
               pin_mem=args.pin_mem,
               ac_num=4,
        )
+       
+       val_g_dataloader = AIRKitchenValDataLoader(
+              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json',
+              view_list=view_list,
+              img_size=args.img_size,
+              frames=args.frames,
+              discretize_actions=args.discretize_actions,
+              norm=args.norm,
+              batch_size=args.batch_size, 
+              num_workers=args.num_workers,
+              pin_mem=args.pin_mem,
+              ac_num=4,
+              statistics=statistics              
+       )
+
+       val_b_dataloader = AIRKitchenValDataLoader(
+              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_b.json',
+              view_list=view_list,
+              img_size=args.img_size,
+              frames=args.frames,
+              discretize_actions=args.discretize_actions,
+              norm=args.norm,
+              batch_size=args.batch_size, 
+              num_workers=args.num_workers,
+              pin_mem=args.pin_mem,
+              ac_num=4,
+              statistics=statistics              
+       )
+
+
+       with open(os.path.join(args.save_path, 'statistics.json'), 'w') as f:
+              json.dump(statistics, f)
 
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion(img_size=args.img_size,
@@ -108,7 +141,7 @@ def main(args):
        # trainer
        test_trainer = BCTrainer(agent, 
                                 rt1dataloader, 
-                                rt1dataloader, 
+                                val_g_dataloader, 
                                 wandb_logger, 
                                 None, 
                                 num_steps=int(args.steps), 

@@ -440,6 +440,7 @@ class AIRKitchenDataset():
               norm: str=None,
               discretize_actions: bool=False,
               ac_num: int=4,
+              statistics: dict=None,
        ):
               self.base_dir = base_dir
               self.img_size = img_size
@@ -450,23 +451,42 @@ class AIRKitchenDataset():
               self.ac_num = ac_num
               
               self.datalist = openjson(datalist)
-              self._statistics()
+              self._statistics(statistics)
               
               transform = [
                      transforms.RandomResizedCrop(img_size, scale=(0.75, 1) ,interpolation=Image.BICUBIC),
                      transforms.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
-                     transforms.ToTensor()
+                     transforms.ToTensor(),
+                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
               ]
               self.transform = transforms.Compose(transform)
 
-       def _statistics(self):
-              all_action = [torch.tensor(data['action'][0]).view(1, -1) for data in self.datalist]
-              actions = torch.cat(all_action)
-              
-              self.a_max = actions.max(0)[0]
-              self.a_min = actions.min(0)[0]
-              self.a_mean = actions.mean(0)
-              self.a_std = actions.std(0)
+       def _statistics(self, statistics=None):
+              if statistics is None:
+                     all_action = [torch.tensor(data['action'][0]).view(1, -1) for data in self.datalist]
+                     actions = torch.cat(all_action)
+                     
+                     self.a_max = actions.max(0)[0]
+                     self.a_min = actions.min(0)[0]
+                     self.a_mean = actions.mean(0)
+                     self.a_std = actions.std(0)
+
+                     all_state = [torch.tensor(data['state']).view(1, -1) for data in self.datalist]
+                     states = torch.cat(all_state)
+                     self.s_max = states.max(0)[0]
+                     self.s_min = states.min(0)[0]
+                     self.s_mean = states.mean(0)
+                     self.s_std = states.std(0)                     
+              else:
+                     self.a_max = statistics['a_max']
+                     self.a_min = statistics['a_min']
+                     self.a_mean = statistics['a_mean']
+                     self.a_std = statistics['a_std']
+
+                     self.s_max = statistics['s_max']
+                     self.s_min = statistics['s_min']
+                     self.s_mean = statistics['s_mean']
+                     self.s_std = statistics['s_std']                     
               
        
        def discretize(self, tensor, num_bins, min_val, max_val):
@@ -486,8 +506,10 @@ class AIRKitchenDataset():
               
               imgs_path = [os.path.join(self.base_dir, step[f'{view}']) for view in self.view_list]
               actions = step['action'][:self.ac_num]
+              state = step['state']
               lang = step['instruction']
               
+              # action
               processed_action = []
               for action in actions:
                      # discretize the action
@@ -502,14 +524,19 @@ class AIRKitchenDataset():
                                    action = (action - self.a_min) / (self.a_max - self.a_min) * 2 - 1
                      processed_action.append(action)
               action = torch.cat(processed_action, dim=-1)
+              
+              # state
+              state = torch.tensor(state)
+              state = (state - self.s_mean) / self.s_std
                             
               # images
               images = [openimage(img_path) for img_path in imgs_path]
-              images = torch.cat([self.transform(image).reshape(1, 1, 3, self.img_size, self.img_size) for image in images], dim=1)
+              images = torch.cat([self.transform(image).reshape(1, 1, -1, self.img_size, self.img_size) for image in images], dim=1)
               
               return {"imgs": images,
                       "label": action,
-                      "lang": lang}
+                      "lang": lang,
+                      "proprio": state}
               
              
 def VideoPredictDataLoader(
@@ -593,9 +620,52 @@ def AIRKitchenDataLoader(
        statistics = {"a_min": dataset.a_min.cpu().numpy().tolist(),
                      "a_max": dataset.a_max.cpu().numpy().tolist(),
                      "a_mean": dataset.a_mean.cpu().numpy().tolist(),
-                     "a_std": dataset.a_std.cpu().numpy().tolist()}
+                     "a_std": dataset.a_std.cpu().numpy().tolist(),
+                     "s_min": dataset.s_min.cpu().numpy().tolist(),
+                     "s_max": dataset.s_max.cpu().numpy().tolist(),
+                     "s_mean": dataset.s_mean.cpu().numpy().tolist(),
+                     "s_std": dataset.s_std.cpu().numpy().tolist(),}
        return dataloader, statistics
   
+
+def AIRKitchenValDataLoader(
+       base_dir: str='',
+       datalist: str='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
+       img_size: int=128,
+       frames: int=1,
+       view_list: list=['D435_image', 'wrist_image'],
+       norm: str="minmax",
+       discretize_actions: bool=False,
+       batch_size: int=64,
+       num_workers: int=8,
+       pin_mem: bool=True,
+       ac_num: int=4,
+       statistics: dict=None,
+):
+       dataset = AIRKitchenDataset(base_dir=base_dir,
+                                   datalist=datalist, 
+                                   frames=frames, 
+                                   img_size=img_size, 
+                                   view_list=view_list, 
+                                   discretize_actions=discretize_actions, 
+                                   norm=norm,
+                                   ac_num=ac_num,
+                                   statistics=statistics)
+       
+       num_tasks = ddp.get_world_size()
+       
+       dataloader = DataLoader(
+              dataset, 
+              batch_size=batch_size // num_tasks, 
+              num_workers=num_workers,
+              pin_memory=pin_mem,
+              drop_last=True
+       )
+       
+       return dataloader
+
+
+
 
 def RT1DataLoader(
        datalist: str='/data/openxdata_npy/datalist.json',
