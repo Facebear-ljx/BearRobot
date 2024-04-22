@@ -1,3 +1,4 @@
+import os
 from utils.logger.base_log import BaseLogger
 from torch.utils.tensorboard import SummaryWriter
 
@@ -15,13 +16,12 @@ class TensorBoardLogger(BaseLogger):
               self.record_freq = record_freq
               
               if rank == 0:
-                     if args.wandb:
-                            wandb.init(project=project_name, 
-                                   name=run_name, 
-                                   sync_tensorboard=True, 
-                                   reinit=True,  
-                                   settings=wandb.Settings(_disable_stats=True))
-                            wandb.config.update(args)
+                     os.environ["WANDB_MODE"] = "offline"
+
+                     wandb.init(project=project_name, 
+                            name=run_name, 
+                            sync_tensorboard=True)
+                     wandb.config.update(args)
                      
                      self.writer = SummaryWriter(log_dir=f'{save_path}/tb')
        
