@@ -16,7 +16,7 @@ class TensorBoardLogger(BaseLogger):
               self.record_freq = record_freq
               
               if rank == 0:
-                     os.environ["WANDB_MODE"] = "offline"
+                     os.environ["WANDB_MODE"] = "online" if args.wandb else "offline"
 
                      wandb.init(project=project_name, 
                             name=run_name, 

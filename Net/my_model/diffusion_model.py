@@ -159,6 +159,8 @@ class VisualDiffusion(nn.Module):
               ac_fn: str='mish',
               time_embeding: str='learned',
               film_fusion: bool=False,
+              encode_s: bool=False,
+              encode_a: bool=False,
               device: str='cpu',
        ):
               """this is a vision-language diffusion model for robotics control
@@ -211,14 +213,16 @@ class VisualDiffusion(nn.Module):
                             idx += 1
               
               # state encoder
+              self.encode_s, self.encode_a = encode_s, encode_a
               self.film_fusion = film_fusion
-              self.state_encoder = MLP(7, [hidden_dim], hidden_dim)  # HARD CODE
+              self.state_encoder = nn.Linear(7, hidden_dim) if self.encode_s else None # HARD CODE
+              s_dim = hidden_dim if self.encode_s else 7 # HARD CODE
               if self.film_fusion:
                      # add image, state, time embedding as film condition to action decoder
                      input_dim = output_dim
                      self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
                      
-                     cond_dim = self.visual_dim * view_num + time_hidden_dim + hidden_dim
+                     cond_dim = self.visual_dim * view_num + time_hidden_dim + s_dim
                      self.film_fusion_layer = nn.ModuleList()
                      for name, child in self.decoder.named_children():
                             if isinstance(child, nn.ModuleList):
@@ -226,11 +230,12 @@ class VisualDiffusion(nn.Module):
                                           feature_dim = block.hidden_dim
                                           self.film_fusion_layer.append(FiLM_layer(cond_dim, feature_dim))
               else:
-                     # simplay concat image, state, time embedding and action as input to action decoder
-                     self.action_encoder = MLP(output_dim, [hidden_dim], hidden_dim)
+                     # simply concat image, state, time embedding and action as input to action decoder
+                     self.action_encoder = nn.Linear(output_dim, hidden_dim) if self.encode_a else None
+                     a_dim = hidden_dim if self.encode_a else output_dim
 
                      # decoder
-                     input_dim = self.visual_dim * view_num + time_hidden_dim + hidden_dim * 2
+                     input_dim = self.visual_dim * view_num + time_hidden_dim + s_dim + a_dim
                      self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
               
               self.device = device      
@@ -288,7 +293,7 @@ class VisualDiffusion(nn.Module):
               # flatted xt
               xt = xt.reshape([xt.shape[0], -1])
               state = state.reshape([state.shape[0], -1])
-              s_feature = self.state_encoder(state)
+              s_feature = self.state_encoder(state) if self.encode_s else state
               
               # encode
               if not isinstance(t, torch.Tensor):
@@ -309,7 +314,7 @@ class VisualDiffusion(nn.Module):
                      noise_pred = self.decoder.dense2(self.decoder.ac_fn(output))
                      return noise_pred
               else:
-                     xt_feature = self.action_encoder(xt)
+                     xt_feature = self.action_encoder(xt) if self.encode_a else xt
                      input_feature = torch.concat([image_feature, time_embedding, xt_feature, s_feature], dim=-1)
                      
                      # decode

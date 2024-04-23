@@ -236,8 +236,8 @@ class BCTrainer:
               save the model to path
               """
               save_model = {'model': self.agent.state_dict(), 
-                            'optimizer': self.optimizer.state_dict() if save_optimizer else None, 
-                            'schedule': self.scheduler.state_dict() if save_schedule else None,
+                            # 'optimizer': self.optimizer.state_dict() if save_optimizer else None, 
+                            # 'schedule': self.scheduler.state_dict() if save_schedule else None,
                             'step': step}
 
               with io.BytesIO() as f:
