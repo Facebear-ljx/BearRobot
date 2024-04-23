@@ -20,6 +20,7 @@ class ResNet(nn.Module):
               pooling_type: str = "avg",
               add_spatial_coordinates: bool = False,
               use_alpha_channel: bool = False,
+              return_interm_layers: bool = False,
               *args, **kwargs
        ):
               super().__init__(*args, **kwargs)
@@ -54,6 +55,13 @@ class ResNet(nn.Module):
               
               if self.c_num > 3:
                      self.model.conv1 = nn.Conv2d(self.c_num, 64, kernel_size=(7, 7), stride=(2, 2), padding=(3, 3), bias=False)
+                     
+              if return_interm_layers:
+                     from torchvision.models._utils import IntermediateLayerGetter
+                     return_layers = {'layer4': "0"}
+                     self.model = IntermediateLayerGetter(self.model, return_layers)
+              
+              self.num_channels = 512 if model_name in ('resnet18', 'resnet34') else 2048
               
        def forward(self, img):
               if self.add_spatial_coordinates:
