@@ -215,7 +215,7 @@ class ACTModel(nn.Module):
               # fold camera dimension into width dimension
               src = rearrange(image_features, '(b f v) c h w -> (b f) c h (w v)', v=V, f=F)
               pos = rearrange(pos, '(f v) c h w -> f c h (w v)', v=V, f=F)
-              hs = self.transformer(src, None, self.query_embed.weight, pos, latent_input, proprio_input, self.additional_pos_embed.weight, cond)[0]
+              hs = self.transformer(src, None, self.query_embed.weight, pos, latent_input, proprio_input, self.additional_pos_embed.weight, cond)[0][-1]
               
               a_hat = self.action_head(hs)
               is_pad_hat = self.is_pad_head(hs)
