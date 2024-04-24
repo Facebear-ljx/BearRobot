@@ -145,7 +145,8 @@ class VisualDiffusion(nn.Module):
               img_size: int=224,  # a dim
               view_num: int=2,
               output_dim: int=7,  # a dim
-              cond_dim: int=768,  # s dim, if condition on s
+              cond_dim: int=768,  # cond dim, if condition on s
+              s_dim: int=0,  # qpos_dim, use qpos when > 0 
               hidden_dim: int=256,
               num_blocks: int=3,
               time_dim: int=32,
@@ -168,7 +169,8 @@ class VisualDiffusion(nn.Module):
               Args:
                   img_size (int, optional): input image size. Defaults to 224.
                   output_dim (int, optional): the action dim. Defaults to 7.
-                  cond_dim (int, optional): the conditional (language embed) information dim. Defaults to 256.
+                  cond_dim (int, optional): the conditional (language embed) information dim. Defaults to 768 (t5 embed dim).
+                  s_dim (int, optional): qpos_dim, use qpos when > 0.
                   hidden_dim (int, optional): decoder hidden dim. Defaults to 256.
                   num_blocks (int, optional): decoder block num. Defaults to 3.
                   time_dim (int, optional): time embedding dim. Defaults to 32.
@@ -215,8 +217,9 @@ class VisualDiffusion(nn.Module):
               # state encoder
               self.encode_s, self.encode_a = encode_s, encode_a
               self.film_fusion = film_fusion
-              self.state_encoder = nn.Linear(7, hidden_dim) if self.encode_s else None # HARD CODE
-              s_dim = hidden_dim if self.encode_s else 7 # HARD CODE
+              self.state_encoder = nn.Linear(s_dim, hidden_dim) if self.encode_s and s_dim > 0 else None
+              s_dim = hidden_dim if self.encode_s and s_dim > 0 else s_dim
+              self.s_dim = s_dim
               if self.film_fusion:
                      # add image, state, time embedding as film condition to action decoder
                      input_dim = output_dim
@@ -292,8 +295,12 @@ class VisualDiffusion(nn.Module):
               """
               # flatted xt
               xt = xt.reshape([xt.shape[0], -1])
-              state = state.reshape([state.shape[0], -1])
-              s_feature = self.state_encoder(state) if self.encode_s else state
+              if self.s_dim > 0:
+                     state = state.reshape([state.shape[0], -1])
+                     s_feature = self.state_encoder(state) if self.encode_s else state
+              else:
+                     # do not use qpos feature
+                     s_feature = None
               
               # encode
               if not isinstance(t, torch.Tensor):
@@ -307,7 +314,7 @@ class VisualDiffusion(nn.Module):
               
               if self.film_fusion:
                      output = self.decoder.dense1(xt)
-                     condition = torch.concat([image_feature, time_embedding, s_feature], dim=-1)
+                     condition = torch.concat([image_feature, time_embedding, s_feature], dim=-1) if s_feature is not None else torch.concat([image_feature, time_embedding], dim=-1)
                      for block, film_layer in zip(self.decoder.mlp_res_blocks, self.film_fusion_layer):
                             output = block(output)
                             output = film_layer(condition, output)
@@ -315,7 +322,7 @@ class VisualDiffusion(nn.Module):
                      return noise_pred
               else:
                      xt_feature = self.action_encoder(xt) if self.encode_a else xt
-                     input_feature = torch.concat([image_feature, time_embedding, xt_feature, s_feature], dim=-1)
+                     input_feature = torch.concat([image_feature, time_embedding, xt_feature, s_feature], dim=-1) if s_feature is not None else torch.concat([image_feature, time_embedding, xt_feature], dim=-1)
                      
                      # decode
                      noise_pred = self.decoder(input_feature)
