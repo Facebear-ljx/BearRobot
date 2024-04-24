@@ -453,13 +453,14 @@ class AIRKitchenDataset():
               self.datalist = openjson(datalist)
               self._statistics(statistics)
               
-              transform = [
-                     transforms.RandomResizedCrop(img_size, scale=(0.75, 1) ,interpolation=Image.BICUBIC),
+              transform_list  = [
                      transforms.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
                      transforms.ToTensor(),
                      transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
               ]
-              self.transform = transforms.Compose(transform)
+              if self.img_size != 0:
+                     transform_list.insert(0, transforms.RandomResizedCrop(self.img_size, scale=(0.75, 1), interpolation=Image.BICUBIC))       
+              self.transform = transforms.Compose(transform_list)
 
        def _statistics(self, statistics=None):
               if statistics is None:
@@ -531,7 +532,7 @@ class AIRKitchenDataset():
                             
               # images
               images = [openimage(img_path) for img_path in imgs_path]
-              images = torch.cat([self.transform(image).reshape(1, 1, -1, self.img_size, self.img_size) for image in images], dim=1)
+              images = torch.cat([self.transform(image).unsqueeze(0).unsqueeze(0) for image in images], dim=1)
               
               return {"imgs": images,
                       "label": action,
