@@ -69,6 +69,8 @@ class ACTAgent(BaseAgent):
               # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
               '''
               text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
+              B, _ = action_gt.shape
+              action_gt = action_gt.reshape(B, -1, 7)
               loss = self.policy_loss(images, text_emb, action_gt, state)
               return loss
        
