@@ -24,7 +24,7 @@ import json
 def get_args():
        parser = basic_args()
        # customize your argparser
-       parser.add_argument('--img_size', default=0, type=int, help='image size, 0 means use the default size')
+       parser.add_argument('--img_size', default=224, type=int, help='image size, 0 means use the default size')
        parser.add_argument('--frames', default=1, type=int, help='frames num input to the visual encoder')
        parser.add_argument('--visual_encoder', default='resnet18', type=str, help='visual encoder backbone, support resnet 18/34/50')
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
@@ -35,12 +35,16 @@ def get_args():
        parser.add_argument('--discretize_actions', default=False, type=boolean, help='whether discretize_actions the action or not')
        
        parser.add_argument('--hidden_dim', default=512, type=int, help='hidden dim for decoder MLP')
+       parser.add_argument('--num_encoder_layers', default=6, type=int, help='number of transformer encoder layers')
+       parser.add_argument('--num_decoder_layers', default=6, type=int, help='number of transformer decoder layers')
+       parser.add_argument('--kl_weight', default=10, type=float, help='KL-divergence weight')
        
        args = parser.parse_args()    
        return args   
 
 
 def main(args):
+       kwargs = vars(args)
        # seed
        seed = args.seed + ddp.get_rank()
        np.random.seed(seed)
@@ -51,6 +55,7 @@ def main(args):
        
        # init ddp
        global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
+       kwargs['device'] = rank
        
        # save 
        if args.save and global_rank==0:
@@ -70,42 +75,21 @@ def main(args):
               base_dir='',
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac-blur.json',
               view_list=view_list,
-              img_size=args.img_size,
-              frames=args.frames,
-              discretize_actions=args.discretize_actions,
-              norm=args.norm,
-              batch_size=args.batch_size, 
-              num_workers=args.num_workers,
-              pin_mem=args.pin_mem,
-              ac_num=4,
+              **kwargs
        )
        
        val_g_dataloader = AIRKitchenValDataLoader(
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json',
               view_list=view_list,
-              img_size=args.img_size,
-              frames=args.frames,
-              discretize_actions=args.discretize_actions,
-              norm=args.norm,
-              batch_size=args.batch_size, 
-              num_workers=args.num_workers,
-              pin_mem=args.pin_mem,
-              ac_num=4,
-              statistics=statistics              
+              statistics=statistics,
+              **kwargs              
        )
 
        val_b_dataloader = AIRKitchenValDataLoader(
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_b.json',
               view_list=view_list,
-              img_size=args.img_size,
-              frames=args.frames,
-              discretize_actions=args.discretize_actions,
-              norm=args.norm,
-              batch_size=args.batch_size, 
-              num_workers=args.num_workers,
-              pin_mem=args.pin_mem,
-              ac_num=4,
-              statistics=statistics              
+              statistics=statistics,
+              **kwargs              
        )
 
 
@@ -114,15 +98,9 @@ def main(args):
 
        # agent and the model for agent
        policy_model = ACTModel(output_dim=7,
-                               ac_num=args.ac_num,
-                               hidden_dim=args.hidden_dim,
-                               vision_encoder=args.visual_encoder,
-                               vision_pretrained=args.visual_pretrain,
-                               ft_vision=args.ft_vision,
-                               num_encoder_layers=6,
-                               num_decoder_layers=6,
-                               device=rank).to(rank)
-       agent = ACTAgent(policy=policy_model)      
+                               **kwargs).to(rank)
+       agent = ACTAgent(policy=policy_model,
+                        kl_weight=args.kl_weight)      
 
        # trainer
        test_trainer = BCTrainer(agent, 

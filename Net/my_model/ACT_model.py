@@ -78,12 +78,14 @@ class ACTModel(nn.Module):
               dropout: float=0.1,
               num_encoder_layers: int=4,
               num_decoder_layers: int=6,
-              vision_encoder: str='resnet18',
-              vision_pretrained: bool=False,
+              visual_encoder: str='resnet18',
+              visual_pretrain: bool=False,
               ft_vision: bool=True,
               use_alpha_channel: bool=False,
               return_interm_layers: bool=True,
               device: str='cpu',
+              *args,
+              **kwargs
        ):
               """A modified version from ACT implementation
 
@@ -97,8 +99,8 @@ class ACTModel(nn.Module):
                   ifconditiononsdropout (float, optional): _description_. Defaults to 0.1.
                   num_encoder_layers (int, optional): _description_. Defaults to 4.
                   num_decoder_layers (int, optional): _description_. Defaults to 6.
-                  vision_encoder (str, optional): _description_. Defaults to 'resnet18'.
-                  vision_pretrained (bool, optional): _description_. Defaults to False.
+                  visual_encoder (str, optional): _description_. Defaults to 'resnet18'.
+                  visual_pretrain (bool, optional): _description_. Defaults to False.
                   ft_vision (bool, optional): _description_. Defaults to True.
                   add_spatial_coordinates (bool, optional): _description_. Defaults to False.
                   use_alpha_channel (bool, optional): _description_. Defaults to False.
@@ -119,8 +121,8 @@ class ACTModel(nn.Module):
               # cnn backbone
               self.ft_vision = ft_vision
               self.backbone = build_backbone(hidden_dim=hidden_dim,
-                                             backbone=vision_encoder,
-                                             pretrained=vision_pretrained,
+                                             backbone=visual_encoder,
+                                             pretrained=visual_pretrain,
                                              use_alpha_channel=use_alpha_channel,
                                              return_interm_layers=return_interm_layers)
 

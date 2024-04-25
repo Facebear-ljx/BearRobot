@@ -593,6 +593,7 @@ def AIRKitchenDataLoader(
        num_workers: int=8,
        pin_mem: bool=True,
        ac_num: int=4,
+       **kwargs,
 ):
        dataset = AIRKitchenDataset(base_dir=base_dir,
                                    datalist=datalist, 
@@ -642,6 +643,7 @@ def AIRKitchenValDataLoader(
        pin_mem: bool=True,
        ac_num: int=4,
        statistics: dict=None,
+       **kwargs,
 ):
        dataset = AIRKitchenDataset(base_dir=base_dir,
                                    datalist=datalist, 
