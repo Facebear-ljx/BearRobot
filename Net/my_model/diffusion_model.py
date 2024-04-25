@@ -242,6 +242,9 @@ class VisualDiffusion(nn.Module):
                      self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
               
               self.device = device      
+              print("s_dim:", s_dim)
+              print("a_dim:", a_dim)
+              print("time_dim:", time_dim)
 
        def forward_visual_feature(self, images: torch.Tensor, condition: torch.Tensor):
               # images shape [B, F, View, C, H, W]

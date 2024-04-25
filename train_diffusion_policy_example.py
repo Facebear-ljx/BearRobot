@@ -33,6 +33,9 @@ def get_args():
        parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
        parser.add_argument('--discretize_actions', default=False, type=boolean, help='whether discretize_actions the action or not')
+       parser.add_argument('--s_dim', default=0, type=int, help='qpos dim, 0 means dont use qpos')
+       parser.add_argument('--encode_s', default=False, type=boolean, help='whether encode the state (qpos) or not')
+       parser.add_argument('--encode_a', default=False, type=boolean, help='whether encode the action or not')
        
        parser.add_argument('--num_blocks', default=3, type=int, help='num blocks for decoder MLP')
        parser.add_argument('--hidden_dim', default=256, type=int, help='hidden dim for decoder MLP')
@@ -135,6 +138,8 @@ def main(args):
                                                  pooling_type=args.pooling_type,
                                                  add_spatial_coordinates=args.add_spatial_coordinates,
                                                  film_fusion=args.film_fusion,
+                                                 encode_a=args.encode_a,
+                                                 encode_s=args.encode_s,
                                                  device=rank).to(rank)
        agent = VLDDPM_BC(policy=visual_diffusion_policy,
                          schedule=args.beta,
