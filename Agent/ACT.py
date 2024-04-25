@@ -71,8 +71,11 @@ class ACTAgent(BaseAgent):
               text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
               B, _ = action_gt.shape
               action_gt = action_gt.reshape(B, -1, 7)
-              loss = self.policy_loss(images, text_emb, action_gt, state)
-              return loss
+              loss, recons_loss, kl_loss = self.policy_loss(images, text_emb, action_gt, state)
+              loss_dict = {"policy_loss": loss,
+                           "recons_loss": recons_loss,
+                           "kl_loss": kl_loss}
+              return loss_dict
        
        def policy_loss(self, images: torch.Tensor, text_emb: torch.Tensor, action_gt: torch.Tensor, state=None):
               '''
@@ -86,8 +89,9 @@ class ACTAgent(BaseAgent):
               
               total_kld, dim_wise_kld, mean_kld = kl_divergence(mu, logvar)
               recons_loss = self.loss_fn(action_gt, a_hat)
-              loss = recons_loss + self.kl_weight * total_kld[0]
-              return loss
+              kl_loss = self.kl_weight * total_kld[0]
+              loss = recons_loss + kl_loss
+              return loss, recons_loss, kl_loss
        
        def q_loss(self):
               raise ValueError("ACT agent is a BC agent, has no q value")

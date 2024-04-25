@@ -165,7 +165,7 @@ class BCTrainer:
                             # one gradient step
                             self.optimizer.zero_grad()
                             loss = self.agent(imgs, lang, label, proprio)
-                            loss.backward()
+                            loss['policy_loss'].backward()
                             self.optimizer.step()
                             t2 = time.time()
                             if self.args.ddp:
@@ -177,9 +177,11 @@ class BCTrainer:
                             
                             # log
                             if self.global_rank == 0:
-                                   pbar.set_description(f"Step {step} train Loss: {loss.item():.4f}")
-                                   self.logger.log_metrics({"train/policy_loss": loss.item(),
-                                                 "train/lr": self.scheduler.get_last_lr()[0],
+                                   pbar.set_description(f"Step {step} train Loss: {loss['policy_loss'].item():.4f}")
+                                   for key in loss.keys():
+                                          loss[f"train/{key}"] = loss.pop(key)
+                                   self.logger.log_metrics(loss, step=step)
+                                   self.logger.log_metrics({"train/lr": self.scheduler.get_last_lr()[0],
                                                  "time/sample": t1-t0,
                                                  "time/train": t2-t1,}, step=step)
                             
@@ -210,8 +212,8 @@ class BCTrainer:
                                    loss = self.agent(imgs, lang, a, proprio)
                                    
                                    if self.global_rank == 0:
-                                          pbar.set_description(f"Step {step} val Loss: {loss.item():.4f}")
-                                   val_loss += loss.item()
+                                          pbar.set_description(f"Step {step} val Loss: {loss['policy_loss'].item():.4f}")
+                                   val_loss += loss['policy_loss'].item()
               
               avg_loss = val_loss / len(self.val_dataloader)
               

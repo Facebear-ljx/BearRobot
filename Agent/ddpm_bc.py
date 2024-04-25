@@ -320,7 +320,8 @@ class VLDDPM_BC(DDPM_BC):
               '''
               text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
               loss = self.policy_loss(action_gt, images, text_emb, state)
-              return loss
+              loss_dict = {"policy_loss": loss}
+              return loss_dict
        
        
        def policy_loss(self, x0: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None):

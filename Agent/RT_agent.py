@@ -46,7 +46,8 @@ class RT1Agent(BaseAgent):
               '''
               text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
               loss = self.policy_loss(images, text_emb, action_gt, state)
-              return loss
+              loss_dict = {"policy_loss": loss}
+              return loss_dict
 
        def logits(self, images: torch.Tensor, texts: list, state=None):
               """
