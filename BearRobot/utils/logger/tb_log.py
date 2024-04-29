@@ -20,7 +20,8 @@ class TensorBoardLogger(BaseLogger):
 
                      wandb.init(project=project_name, 
                             name=run_name, 
-                            sync_tensorboard=True)
+                            sync_tensorboard=True,
+                            dir=f'{save_path}')
                      wandb.config.update(args)
                      
                      self.writer = SummaryWriter(log_dir=f'{save_path}/tb')
