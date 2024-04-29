@@ -84,19 +84,19 @@ class DDPM_BC(BaseAgent):
        def __init__(
               self, 
               policy: torch.nn.Module, 
-              schedule: str='cosine',
-              num_timesteps: int=5,
+              beta: str='cosine',
+              T: int=5,
        ):
               super().__init__(
                      policy, None, None
               )
               
               self.device = policy.device
-              if schedule not in SCHEDULE.keys():
-                     raise ValueError(f"Invalid schedule '{schedule}'. Expected one of: {list(SCHEDULE.keys())}")
-              self.schedule = SCHEDULE[schedule]
+              if beta not in SCHEDULE.keys():
+                     raise ValueError(f"Invalid schedule '{beta}'. Expected one of: {list(SCHEDULE.keys())}")
+              self.schedule = SCHEDULE[beta]
               
-              self.num_timesteps = num_timesteps
+              self.num_timesteps = T
               self.betas = self.schedule(self.num_timesteps).to(self.device)
               self.alphas = (1 - self.betas).to(self.device)
               self.alphas_cumprod = torch.cumprod(self.alphas, dim=0).to(self.device)
@@ -288,12 +288,13 @@ class VLDDPM_BC(DDPM_BC):
        def __init__(
               self, 
               policy: VisualDiffusion, 
-              schedule: str='cosine',  
-              num_timesteps: int=5,
+              beta: str='cosine',  
+              T: int=5,
               text_encoder: str="t5",
-              device = 'cuda'
+              device = 'cuda',
+              *args, **kwargs
        ):
-              super().__init__(policy, schedule, num_timesteps)
+              super().__init__(policy, beta, T)
               
               self.img_size = self.policy.img_size
               

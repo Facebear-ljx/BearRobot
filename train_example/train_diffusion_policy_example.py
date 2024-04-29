@@ -51,6 +51,7 @@ def get_args():
 
 
 def main(args):
+       kwargs = vars(args)
        # seed
        seed = args.seed + ddp.get_rank()
        np.random.seed(seed)
@@ -61,6 +62,7 @@ def main(args):
        
        # init ddp
        global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
+       kwargs['device'] = rank
        
        # save 
        if args.save and global_rank==0:
@@ -80,71 +82,24 @@ def main(args):
               base_dir='',
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac-blur.json',
               view_list=view_list,
-              img_size=args.img_size,
-              frames=args.frames,
-              discretize_actions=args.discretize_actions,
-              norm=args.norm,
-              batch_size=args.batch_size, 
-              num_workers=args.num_workers,
-              pin_mem=args.pin_mem,
-              ac_num=4,
+              **kwargs
        )
        
        val_g_dataloader = AIRKitchenValDataLoader(
               datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json',
               view_list=view_list,
-              img_size=args.img_size,
-              frames=args.frames,
-              discretize_actions=args.discretize_actions,
-              norm=args.norm,
-              batch_size=args.batch_size, 
-              num_workers=args.num_workers,
-              pin_mem=args.pin_mem,
-              ac_num=4,
-              statistics=statistics              
+              statistics=statistics,
+              **kwargs              
        )
-
-       val_b_dataloader = AIRKitchenValDataLoader(
-              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_b.json',
-              view_list=view_list,
-              img_size=args.img_size,
-              frames=args.frames,
-              discretize_actions=args.discretize_actions,
-              norm=args.norm,
-              batch_size=args.batch_size, 
-              num_workers=args.num_workers,
-              pin_mem=args.pin_mem,
-              ac_num=4,
-              statistics=statistics              
-       )
-
 
        with open(os.path.join(args.save_path, 'statistics.json'), 'w') as f:
               json.dump(statistics, f)
 
        # agent and the model for agent
-       visual_diffusion_policy = VisualDiffusion(img_size=args.img_size,
-                                                 view_num=len(view_list), 
+       visual_diffusion_policy = VisualDiffusion(view_num=len(view_list), 
                                                  output_dim=int(7 * args.ac_num),
-                                                 num_blocks=args.num_blocks,
-                                                 hidden_dim=args.hidden_dim,
-                                                 time_embeding=args.time_embed,
-                                                 time_dim=args.time_dim,
-                                                 time_hidden_dim=args.time_hidden_dim,
-                                                 vision_encoder=args.visual_encoder,
-                                                 vision_pretrained=args.visual_pretrain,
-                                                 ft_vision=args.ft_vision,
-                                                 norm_type=args.norm_type,
-                                                 pooling_type=args.pooling_type,
-                                                 add_spatial_coordinates=args.add_spatial_coordinates,
-                                                 film_fusion=args.film_fusion,
-                                                 encode_a=args.encode_a,
-                                                 encode_s=args.encode_s,
-                                                 device=rank).to(rank)
-       agent = VLDDPM_BC(policy=visual_diffusion_policy,
-                         schedule=args.beta,
-                         num_timesteps=args.T,
-                         text_encoder="t5")      
+                                                 **kwargs).to(rank)
+       agent = VLDDPM_BC(policy=visual_diffusion_policy, **kwargs)      
 
        # trainer
        test_trainer = BCTrainer(agent, 

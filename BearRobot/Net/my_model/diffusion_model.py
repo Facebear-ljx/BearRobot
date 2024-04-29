@@ -151,18 +151,20 @@ class VisualDiffusion(nn.Module):
               num_blocks: int=3,
               time_dim: int=32,
               time_hidden_dim: int=256,
-              vision_encoder: str='resnet18',
-              vision_pretrained: bool=False,
+              visual_encoder: str='resnet18',
+              visual_pretrain: bool=False,
               ft_vision: bool=True,
               norm_type: str="bn",
               pooling_type: str='avg',
               add_spatial_coordinates: bool=False,
               ac_fn: str='mish',
-              time_embeding: str='learned',
+              time_embed: str='learned',
               film_fusion: bool=False,
               encode_s: bool=False,
               encode_a: bool=False,
               device: str='cpu',
+              *args,
+              **kwargs
        ):
               """this is a vision-language diffusion model for robotics control
 
@@ -175,14 +177,14 @@ class VisualDiffusion(nn.Module):
                   num_blocks (int, optional): decoder block num. Defaults to 3.
                   time_dim (int, optional): time embedding dim. Defaults to 32.
                   time_hidden_dim (int, optional): time encoder dim. Defaults to 256.
-                  vision_encoder (str, optional): vision backbone name. Defaults to 'resnet18'.
-                  vision_pretrained (bool, optional): load pretrained vision backbone. Defaults to False.
+                  visual_encoder (str, optional): vision backbone name. Defaults to 'resnet18'.
+                  visual_pretrain (bool, optional): load pretrained vision backbone. Defaults to False.
                   ft_vision (bool, optional): train the vision backbone. Defaults to True.
                   norm_type (str, optional): vision backbone norm type. Defaults to "bn".
                   pooling_type (str, optional): vision backbone pooling type. Defaults to 'avg'.
                   add_spatial_coordinates (bool, optional): add spatial coordinates to the image. Defaults to False.
                   ac_fn (str, optional): decoder activation. Defaults to 'mish'.
-                  time_embeding (str, optional): learned or fixed time embedding. Defaults to 'learned'.
+                  time_embed (str, optional): learned or fixed time embedding. Defaults to 'learned'.
                   film_fusion (bool, optional): use film fusion for decoder. Defaults to False.
                   device (str, optional): cpu or cuda. Defaults to 'cpu'.
               """              
@@ -193,14 +195,14 @@ class VisualDiffusion(nn.Module):
               self.cond_dim = cond_dim
               
               # visual encoder
-              assert vision_encoder in visual_dim
-              self.visual_encoder = ResNet(vision_encoder, pretrained=vision_pretrained, norm_type=norm_type, pooling_type=pooling_type, add_spatial_coordinates=add_spatial_coordinates)
-              self.visual_dim = visual_dim[vision_encoder]
+              assert visual_encoder in visual_dim
+              self.visual_encoder = ResNet(visual_encoder, pretrained=visual_pretrain, norm_type=norm_type, pooling_type=pooling_type, add_spatial_coordinates=add_spatial_coordinates)
+              self.visual_dim = visual_dim[visual_encoder]
               
               # time embedding
-              if time_embeding not in TIMEEMBED.keys():
-                     raise ValueError(f"Invalid time_embedding '{time_embeding}'. Expected one of: {list(TIMEEMBED.keys())}")
-              self.time_process = TIMEEMBED[time_embeding](1, time_dim)
+              if time_embed not in TIMEEMBED.keys():
+                     raise ValueError(f"Invalid time_embedding '{time_embed}'. Expected one of: {list(TIMEEMBED.keys())}")
+              self.time_process = TIMEEMBED[time_embed](1, time_dim)
               self.time_encoder = MLP(time_dim, [time_hidden_dim], time_hidden_dim, ac_fn='mish')
               
               # film condition layer
