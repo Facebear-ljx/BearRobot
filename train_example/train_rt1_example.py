@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from BearRobot.Net.my_model.RT_model import RT1Model
 from BearRobot.Agent.RT_agent import RT1Agent
 
-from BearRobot.utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader
+from BearRobot.utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader, AIRKitchenDataLoader, AIRKitchenValDataLoader
 from BearRobot.utils.logger.tb_log import TensorBoardLogger as Logger
 from BearRobot.utils.net.initialization import boolean
 from BearRobot.utils import ddp
@@ -82,21 +82,31 @@ def main(args):
        wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
 
        # dataset and dataloader
-       rt1dataloader = RT1DataLoader(
-              datalist='/home/dodo/ljx/BearRobot/data/bridge/bridge_datalist_train.json',
+       view_list = ['D435_image', 'wrist_image']
+       rt1dataloader, statistics = AIRKitchenDataLoader(
+              base_dir='',
+              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac-blur.json',
+              view_list=view_list,
               img_size=args.img_size,
               frames=args.frames,
+              discretize_actions=True,
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
               pin_mem=args.pin_mem,
+              ac_num=1,
        )
        
-       valdataloader = RT1ValDataLoader(
-              datalist='/home/dodo/ljx/BearRobot/data/bridge/bridge_datalist_test.json',
+       val_g_dataloader = AIRKitchenValDataLoader(
+              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json',
+              view_list=view_list,
               img_size=args.img_size,
+              frames=args.frames,
+              discretize_actions=True,
               batch_size=args.batch_size, 
               num_workers=args.num_workers,
               pin_mem=args.pin_mem,
+              ac_num=1,
+              statistics=statistics              
        )
 
        # agent and the model for agent
@@ -106,7 +116,7 @@ def main(args):
        # trainer
        test_trainer = BCTrainer(rt1agent, 
                                 rt1dataloader, 
-                                valdataloader, 
+                                val_g_dataloader, 
                                 wandb_logger, 
                                 None, 
                                 num_steps=int(args.steps), 

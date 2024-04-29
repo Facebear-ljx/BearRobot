@@ -178,9 +178,8 @@ class BCTrainer:
                             # log
                             if self.global_rank == 0:
                                    pbar.set_description(f"Step {step} train Loss: {loss['policy_loss'].item():.4f}")
-                                   for key in loss.keys():
-                                          loss[f"train/{key}"] = loss.pop(key)
-                                   self.logger.log_metrics(loss, step=step)
+                                   loss_log = {f"train/{key}": value.item() for key, value in loss.items()}
+                                   self.logger.log_metrics(loss_log, step=step)
                                    self.logger.log_metrics({"train/lr": self.scheduler.get_last_lr()[0],
                                                  "time/sample": t1-t0,
                                                  "time/train": t2-t1,}, step=step)
@@ -189,7 +188,7 @@ class BCTrainer:
                             if self.save:
                                    if (step + 1) % self.save_freq == 0:
                                           if self.global_rank == 0:
-                                                 self.save_model(step, loss['train/policy_loss'].item())
+                                                 self.save_model(step, loss_log['train/policy_loss'].item())
                             
                             # validation
                             if (step + 1) % self.args.val_freq == 0:
