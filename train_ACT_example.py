@@ -5,15 +5,15 @@ import random
 import torch
 import numpy as np
 
-from Net.my_model.ACT_model import ACTModel
-from Agent.ACT import ACTAgent
+from BearRobot.Net.my_model.ACT_model import ACTModel
+from BearRobot.Agent.ACT import ACTAgent
 
-from utils.dataset.dataloader import AIRKitchenDataLoader, AIRKitchenValDataLoader
-from utils.logger.tb_log import TensorBoardLogger as Logger
-from utils.net.initialization import boolean
-from utils import ddp
-from Trainer.trainer import BCTrainer
-from config.basic_args import basic_args, diffusion_args
+from BearRobot.utils.dataset.dataloader import AIRKitchenDataLoader, AIRKitchenValDataLoader
+from BearRobot.utils.logger.tb_log import TensorBoardLogger as Logger
+from BearRobot.utils.net.initialization import boolean
+from BearRobot.utils import ddp
+from BearRobot.Trainer.trainer import BCTrainer
+from BearRobot.config.basic_args import basic_args, diffusion_args
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 import torch.multiprocessing as mp

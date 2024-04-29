@@ -14,4 +14,5 @@ conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvi
 Next
 ```
 pip install -r requirements.txt
+pip install -e .
 ```

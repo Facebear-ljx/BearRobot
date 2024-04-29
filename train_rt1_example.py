@@ -6,14 +6,14 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-from Net.my_model.RT_model import RT1Model
-from Agent.RT_agent import RT1Agent
+from BearRobot.Net.my_model.RT_model import RT1Model
+from BearRobot.Agent.RT_agent import RT1Agent
 
-from utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader
-from utils.logger.tb_log import TensorBoardLogger as Logger
-from utils.net.initialization import boolean
-from utils import ddp
-from Trainer.trainer import BCTrainer
+from BearRobot.utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader
+from BearRobot.utils.logger.tb_log import TensorBoardLogger as Logger
+from BearRobot.utils.net.initialization import boolean
+from BearRobot.utils import ddp
+from BearRobot.Trainer.trainer import BCTrainer
 from torch.nn.parallel import DistributedDataParallel as DDP
 
 import torch.multiprocessing as mp

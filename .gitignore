@@ -12,3 +12,4 @@ experiments/
 log/
 data/
 pretrained_model/
+*.egg-info/

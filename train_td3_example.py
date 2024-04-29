@@ -2,15 +2,15 @@ import torch
 import numpy as np
 from torch.utils.data import DataLoader
 
-from Net.my_model.critic_model import MLPV, MLPQs
-from Net.my_model.MLPpolicy import MLPPi
-from Agent.TD3 import TD3_Agent
+from BearRobot.Net.my_model.critic_model import MLPV, MLPQs
+from BearRobot.Net.my_model.MLPpolicy import MLPPi
+from BearRobot.Agent.TD3 import TD3_Agent
 
-from utils.dataset.onlineRL_dataloader import OnlineReplaybuffer
-from Trainer.online_trainer import RLTrainer
+from BearRobot.utils.dataset.onlineRL_dataloader import OnlineReplaybuffer
+from BearRobot.Trainer.online_trainer import RLTrainer
 
-from utils.evaluation.d4rl_eval import D4RLEval
-from utils.logger.wandb_log import WandbLogger
+from BearRobot.utils.evaluation.d4rl_eval import D4RLEval
+from BearRobot.utils.logger.wandb_log import WandbLogger
 
 import gym
 
