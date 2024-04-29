@@ -189,7 +189,7 @@ class BCTrainer:
                             if self.save:
                                    if (step + 1) % self.save_freq == 0:
                                           if self.global_rank == 0:
-                                                 self.save_model(step, loss.item())
+                                                 self.save_model(step, loss['train/policy_loss'].item())
                             
                             # validation
                             if (step + 1) % self.args.val_freq == 0:

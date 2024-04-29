@@ -98,6 +98,7 @@ def main(args):
 
        # agent and the model for agent
        policy_model = ACTModel(output_dim=7,
+                               dim_feedforward=3200,
                                **kwargs).to(rank)
        agent = ACTAgent(policy=policy_model,
                         kl_weight=args.kl_weight)      
