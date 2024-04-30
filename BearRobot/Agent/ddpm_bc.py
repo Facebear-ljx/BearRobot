@@ -298,13 +298,6 @@ class VLDDPM_BC(DDPM_BC):
               
               self.img_size = self.policy.img_size
               
-              transform = [
-                     transforms.Resize(256, interpolation=Image.BICUBIC),
-                     transforms.CenterCrop(self.img_size),
-                     transforms.ToTensor()
-              ]
-              
-              self.transform = transforms.Compose(transform)
               
               assert text_encoder == 't5'
               self.lang_encoder = T5Encoder(device=device)
@@ -393,11 +386,26 @@ class VLDDPM_BC(DDPM_BC):
        
 
        @torch.no_grad()
-       def get_action(self, imgs, lang, state=None, num=1, clip_sample=False):
-              if not isinstance(imgs, torch.Tensor):
-                     imgs = self.transform(imgs)
-              
-              return self.ddpm_sampler((num, self.policy.output_dim), imgs, lang, state, clip_sample=clip_sample)
+       def get_action(self, imgs, lang, state=None, num=1, clip_sample=True):
+            if not isinstance(imgs, torch.Tensor):
+                # transform lists to torch.Tensor
+                imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")).reshape(-1, self.img_size, self.img_size) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
+            
+            state = torch.from_numpy(state.astype(np.float32)).view(1, -1) if state is not None else None
+            state = (state - self.s_mean) / self.s_std if state is not None else None
+            # state = None
+            action = self.ddpm_sampler((num, self.policy.module.output_dim), imgs, [lang], state, clip_sample=clip_sample).detach().cpu().view(-1)
+            action = action.view(-1, 7)
+            
+            N, _ = action.shape
+            a_max = self.a_max.repeat(N, 1)
+            a_min = self.a_min.repeat(N, 1)
+            a_mean = self.a_mean.repeat(N, 1)
+            a_std = self.a_std.repeat(N, 1)
+            
+            action = (action + 1) * (a_max - a_min) / 2 + a_min
+            # action = action * a_std + a_mean
+            return action.numpy()
        
 
 class IDQL_Agent(BaseAgent):

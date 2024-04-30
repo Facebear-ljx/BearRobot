@@ -42,11 +42,6 @@ class ACTAgent(BaseAgent):
                      None
               )
               
-              transform = [
-                     transforms.ToTensor(),
-                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-              ]
-              self.transform = transforms.Compose(transform)
               assert text_encoder == 't5'
               self.lang_encoder = T5Encoder(device=device)
               print("lang encoder load success")
@@ -100,19 +95,28 @@ class ACTAgent(BaseAgent):
               raise ValueError("ACT agent is a BC agent, has no v value")
               
        @torch.no_grad()
-       def get_action(self, images, text: list, state=None):
+       def get_action(self, imgs, text: list, state=None):
               """
               get one action
-              # images: one frames of different views, [1, Frame, View, C, H, W]
+              # imgs: one frames of different views, [1, Frame, View, C, H, W]
               # texts: list of instruction
               # state shape [1, D] robot arm x,y,z, gripper state, et al
               """
-              # TODO here has a bug
-              if not isinstance(images, torch.Tensor):
+              if not isinstance(imgs, torch.Tensor):
                      # transform lists to torch.Tensor
-                     images = [torch.stack([torch.stack([self.transform(view).reshape(3, self.img_size, self.img_size) for view in frame_list]) for frame_list in one_images]).unsqueeze(0) for one_images in images]
-                     images = torch.cat(images, dim=0)  # tensor [1, Frame, View, C, H, W]
+                     imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
+
+              state = torch.from_numpy(state.astype(np.float32)).view(1, -1) if state is not None else None
+              state = (state - self.s_mean) / self.s_std if state is not None else None
               
-              text_emb = self.lang_encoder.embed_text(text).to(images.device)
-              action, _, (_, _) = self.policy(state, images, text_emb)
-              return action
+              text_emb = self.lang_encoder.embed_text([text]).to(imgs.device).detach()
+              action, _, (_, _) = self.policy(state, imgs, cond=text_emb)
+
+              action = action.squeeze(0).detach().cpu()
+              N, _ = action.shape
+              a_max = self.a_max.repeat(N, 1)
+              a_min = self.a_min.repeat(N, 1)
+              a_mean = self.a_mean.repeat(N, 1)
+              a_std = self.a_std.repeat(N, 1)
+              action = (action + 1) * (a_max - a_min) / 2 + a_min
+              return action.numpy()
