@@ -47,11 +47,12 @@ def wandb_args2dict(ckpt_path, wandb_name: str=None):
                 return {}
 
 
-def wandb_yaml2dict(ckpt_path, wandb_name: str=None):
+def wandb_yaml2dict(ckpt_path, wandb_name: str=None, wandb_path: str=None):
         if wandb_name is None:
                 wandb_name = 'latest-run'
         try:
-                wandb_path = os.path.join('/'.join(ckpt_path.split('.pth')[0].split('/')[:-1]), f'wandb/{wandb_name}/files/config.yaml')
+                if wandb_path is None:
+                        wandb_path = os.path.join('/'.join(ckpt_path.split('.pth')[0].split('/')[:-1]), f'wandb/{wandb_name}/files/config.yaml')
                 with open(wandb_path, 'r') as stream:
                         config = yaml.safe_load(stream)
                 del config['wandb_version']
@@ -82,8 +83,8 @@ def load_ckpt(agent, ckpt_path):
         return agent.to(0)
 
 
-def build_ACT(ckpt_path: str, statistics_path: str, wandb_name: str=None):
-        kwargs = wandb_yaml2dict(ckpt_path, wandb_name)
+def build_ACT(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_path: str=None):
+        kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
         model = ACTModel(output_dim=7,
                          dim_feedforward=3200,
                          **kwargs).to(0)
@@ -93,25 +94,41 @@ def build_ACT(ckpt_path: str, statistics_path: str, wandb_name: str=None):
         return load_ckpt(agent, ckpt_path)
 
 
-def build_visual_diffusino(ckpt_path: str, statistics_path: str, wandb_name: str=None):
-        model = VisualDiffusion(img_size=224, 
-                                view_num=2, 
-                                output_dim=28, 
-                                device=0, 
-                                vision_pretrained=False, 
-                                vision_encoder='resnet50', 
-                                add_spatial_coordinates=True,
-                                norm_type='bn',
-                                encode_a=True,
-                                encode_s=True,
-                                s_dim=7).to(0)
-        agent = VLDDPM_BC(model, num_timesteps=25, schedule='vp')      
+def build_visual_diffsuion(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_path: str=None):
+        kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
+        model = VisualDiffusion(view_num=2,
+                                output_dim=28,
+                                **kwargs).to(0)
+        agent = VLDDPM_BC(model, num_timesteps=25, schedule='vp') 
         agent.get_statistics(statistics_path)
-        agent.get_transform()
-        agent = load_ckpt(agent, ckpt_path)
-        return agent
+        agent.get_transform(kwargs['img_size'])
+        return load_ckpt(agent, ckpt_path)
+
+
+# def build_visual_diffusino(ckpt_path: str, statistics_path: str, wandb_name: str=None):
+#         model = VisualDiffusion(img_size=224, 
+#                                 view_num=2, 
+#                                 output_dim=28, 
+#                                 device=0, 
+#                                 vision_pretrained=False, 
+#                                 vision_encoder='resnet50', 
+#                                 add_spatial_coordinates=True,
+#                                 norm_type='bn',
+#                                 encode_a=True,
+#                                 encode_s=True,
+#                                 s_dim=7).to(0)
+#         agent = VLDDPM_BC(model, num_timesteps=25, schedule='vp')      
+#         agent.get_statistics(statistics_path)
+#         agent.get_transform()
+#         agent = load_ckpt(agent, ckpt_path)
+#         return agent
 
 
 if __name__ == '__main__':      
-        agent = build_ACT("/home/dodo/ljx/BearRobot/experiments/airkitchen/ACT/40W_v0/latest.pth",
-                          "/home/dodo/ljx/BearRobot/experiments/airkitchen/diffusion/ACT_20W_T25_bn_spatial_normtrans_saencoder/statistics.json")
+        # agent = build_ACT("/home/dodo/ljx/BearRobot/experiments/airkitchen/ACT/40W_v0/latest.pth",
+        #                   "/home/dodo/ljx/BearRobot/experiments/airkitchen/diffusion/ACT_20W_T25_bn_spatial_normtrans_saencoder/statistics.json")
+        
+
+        agent = build_visual_diffsuion("/home/dodo/ljx/BearRobot/experiments/airkitchen/diffusion/ACT_40W_T25_bn_spatial_normtrans_salinear/399999_0.2852.pth",
+                                       "/home/dodo/ljx/BearRobot/experiments/airkitchen/diffusion/ACT_20W_T25_bn_spatial_normtrans_saencoder/statistics.json",
+                                       wandb_path="/home/dodo/ljx/BearRobot/experiments/airkitchen/diffusion/ACT_40W_T25_bn_spatial_normtrans_salinear/offline-run-20240424_160423-u1r3yiwo/files/config.yaml")
