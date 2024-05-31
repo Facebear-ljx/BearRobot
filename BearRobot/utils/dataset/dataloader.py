@@ -8,6 +8,7 @@ import torch.nn as nn
 import numpy as np
 
 from PIL import Image
+import cv2
 from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torchvision import transforms
@@ -441,6 +442,7 @@ class AIRKitchenDataset():
               discretize_actions: bool=False,
               ac_num: int=4,
               statistics: dict=None,
+              mask_aug: bool=False,  # True for IVM training, False for normal training
        ):
               self.base_dir = base_dir
               self.img_size = img_size
@@ -449,6 +451,7 @@ class AIRKitchenDataset():
               self.discretize_actions = discretize_actions
               self.norm = norm
               self.ac_num = ac_num
+              self.mask_aug = mask_aug
               
               self.datalist = openjson(datalist)
               self._statistics(statistics)
@@ -499,6 +502,23 @@ class AIRKitchenDataset():
               discretized_tensor = discretized_tensor
               return discretized_tensor
 
+       def aug_mask(self, step, image):
+              threshold = np.random.uniform(0.4, 0.9)
+              dilate_kernel_size = np.random.randint(3, 20) * 2 + 1
+
+              mask_path = step['mask']
+              mask = np.load(mask_path, allow_pickle=True)['arr_0']
+              mask_output = np.where(mask > threshold, 1, 0).astype(np.uint8)
+              kernel = cv2.getStructuringElement(cv2.MORPH_RECT,(dilate_kernel_size,dilate_kernel_size)) # ksize=7x7,
+              mask_output = cv2.dilate(mask_output,kernel,iterations=1).astype(np.float32)
+              mask_output = cv2.GaussianBlur(mask_output, (dilate_kernel_size, dilate_kernel_size), 0)[:,:,np.newaxis]
+              
+              fill_color=(255, 255, 255)
+              fill_tensor = torch.tensor(fill_color, dtype=torch.uint8).repeat(mask.shape[0], mask.shape[1], 1)
+              masked_image = np.asarray(image).astype(np.float32) * mask  + fill_tensor.numpy() * (1 - mask)
+              masked_image = Image.fromarray(masked_image.astype(np.uint8))  # highlight image with mask
+              return masked_image
+                      
        def __len__(self):
               return len(self.datalist)
 
@@ -532,6 +552,8 @@ class AIRKitchenDataset():
                             
               # images
               images = [openimage(img_path) for img_path in imgs_path]
+              if self.mask_aug:
+                     images[0] = self.aug_mask(step, images[0])           
               images = torch.cat([self.transform(image).unsqueeze(0).unsqueeze(0) for image in images], dim=1)
               
               return {"imgs": images,
