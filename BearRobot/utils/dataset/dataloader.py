@@ -434,7 +434,7 @@ class AIRKitchenDataset():
        def __init__(
               self,
               base_dir='',
-              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json',
+              datalist=['/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json'],
               img_size: int=128,
               frames: int=3,
               view_list: list=['D435_image', 'wrist_image'],
@@ -453,7 +453,11 @@ class AIRKitchenDataset():
               self.ac_num = ac_num
               self.mask_aug = mask_aug
               
-              self.datalist = openjson(datalist)
+              self.datalist = []
+              for one_list in datalist:
+                     datalist = openjson(one_list)
+                     self.datalist += datalist
+                     
               self._statistics(statistics)
               
               transform_list  = [
@@ -605,7 +609,7 @@ def VideoPredictDataLoader(
 
 def AIRKitchenDataLoader(
        base_dir: str='',
-       datalist: str='/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json',
+       datalist: list=['/home/dodo/ljx/BearRobot/data/bridge/AIR-toykitchen.json'],
        img_size: int=128,
        frames: int=1,
        view_list: list=['D435_image', 'wrist_image'],
