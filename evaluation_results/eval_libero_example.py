@@ -7,6 +7,6 @@ ckpt_path = '/home/dodo/ljx/BearRobot/experiments/libero/diffusion/test/latest.p
 statistic_path = '/home/dodo/ljx/BearRobot/experiments/libero/diffusion/test/statistics.json'
 
 policy = build_visual_diffsuion(ckpt_path, statistic_path)
-evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None)
+evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300)
 
 evaluator.eval_episodes(policy, 0)

@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 import copy
 
 class BaseAgent(nn.Module):
@@ -11,6 +12,7 @@ class BaseAgent(nn.Module):
               gamma: float=0.99,
               utd: int=2,
               start_steps: int=int(25e3),
+              ac_num: int=1,
        ):       
               super().__init__()
               self.policy = policy
@@ -23,6 +25,10 @@ class BaseAgent(nn.Module):
               self.utd = utd
               self.gamma = gamma
               self.device = policy.device
+              
+              # action chunking
+              self.use_ac = True if ac_num > 1 else False
+              self.ac_num = ac_num                    
               
        def get_action(self, state):
               """
@@ -47,7 +53,32 @@ class BaseAgent(nn.Module):
        
        def v_loss(self):
               pass
+       
+       def _init_action_chunking(self, eval_horizon: int=600):
+              self.all_time_actions = np.zeros([eval_horizon, eval_horizon+self.ac_num, 7])
+       
+       # action_trunking
+       def get_ac_action(self, actions, t: int, k: float=0.25):
+              """get action trunking + temporal ensemble action
 
+              Args:
+                  actions (np.array): the predicted action sequence
+                  t (int): current time step
+                  k (float, optional): the temperature of temporal ensemble. Defaults to 0.25.
+              """
+              if self.use_ac:
+                     actions = actions.reshape(-1, 7)
+                     self.all_time_actions[[t], t:t+self.ac_num] = actions
+                     actions_for_curr_step = self.all_time_actions[:, t]
+                     actions_populated = np.all(actions_for_curr_step != 0, axis = 1)
+                     actions_for_curr_step = actions_for_curr_step[actions_populated]
+                     exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
+                     exp_weights = (exp_weights / exp_weights.sum()).reshape(-1, 1)
+                     actions = (actions_for_curr_step * exp_weights).sum(axis=0)
+                     return actions
+              else:
+                     return actions
+       
        def get_statistics(self, path):
               from mmengine import fileio
               import json

@@ -99,7 +99,7 @@ def build_visual_diffsuion(ckpt_path: str, statistics_path: str, wandb_name: str
         model = VisualDiffusion(view_num=2,
                                 output_dim=7 * kwargs['ac_num'],
                                 **kwargs).to(0)
-        agent = VLDDPM_BC(model, num_timesteps=kwargs['T'], schedule=kwargs['beta']) 
+        agent = VLDDPM_BC(model, num_timesteps=kwargs['T'], schedule=kwargs['beta'], ac_num=kwargs['ac_num']) 
         agent.get_statistics(statistics_path)
         agent.get_transform(kwargs['img_size'])
         return load_ckpt(agent, ckpt_path)

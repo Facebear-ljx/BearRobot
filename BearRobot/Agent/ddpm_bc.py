@@ -86,9 +86,10 @@ class DDPM_BC(BaseAgent):
               policy: torch.nn.Module, 
               beta: str='cosine',
               T: int=5,
+              ac_num: int=1,
        ):
               super().__init__(
-                     policy, None, None
+                     policy, None, None, ac_num=ac_num
               )
               
               self.device = policy.device
@@ -290,11 +291,12 @@ class VLDDPM_BC(DDPM_BC):
               policy: VisualDiffusion, 
               beta: str='cosine',  
               T: int=5,
+              ac_num: int=1,
               text_encoder: str="t5",
               device = 'cuda',
               *args, **kwargs
        ):
-              super().__init__(policy, beta, T)
+              super().__init__(policy, beta, T, ac_num)
               
               self.img_size = self.policy.img_size
               
@@ -386,7 +388,7 @@ class VLDDPM_BC(DDPM_BC):
        
 
        @torch.no_grad()
-       def get_action(self, imgs, lang, state=None, num=1, clip_sample=True):
+       def get_action(self, imgs, lang, state=None, num=1, t=1, k=0.25, clip_sample=True):
             if not isinstance(imgs, torch.Tensor):
                 # transform lists to torch.Tensor
                 imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")).reshape(-1, self.img_size, self.img_size) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
@@ -404,8 +406,9 @@ class VLDDPM_BC(DDPM_BC):
             a_std = self.a_std.repeat(N, 1)
             
             action = (action + 1) * (a_max - a_min) / 2 + a_min
+            action = self.get_ac_action(action.numpy(), t, k)
             # action = action * a_std + a_mean
-            return action.numpy()
+            return action
        
 
 class IDQL_Agent(BaseAgent):

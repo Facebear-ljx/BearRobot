@@ -23,6 +23,7 @@ class LIBEROEval(BaseEval):
               obs_key: list=['agentview_image', 'robot0_eye_in_hand_image'],
               data_statistics: dict=None,
               logger: BaseLogger=None,
+              eval_horizon: int=600,
               num_episodes: int=10,
               eval_freq: int=10,
               seed: int=42,
@@ -34,6 +35,7 @@ class LIBEROEval(BaseEval):
               self.obs_key = obs_key
               self.data_statistics = data_statistics
               
+              self.eval_horizon = eval_horizon
               self.num_episodes = num_episodes
               self.eval_freq = eval_freq
               self.logger = logger
@@ -95,15 +97,17 @@ class LIBEROEval(BaseEval):
                      init_states = self.task_suite.get_task_init_states(env['task_id']) # for benchmarking purpose, we fix the a set of initial states
                      init_state_id = 0
                      obs = env['env'].set_init_state(init_states[init_state_id])
+                     lang = env['env'].language_instruction
                      
                      images = []
-                     for _ in range(200):
+                     policy._init_action_chunking(self.eval_horizon)
+                     for t in tqdm(range(self.eval_horizon), desc=f'{lang}'):
                             # get image
                             images.append(np.flip(np.flip(obs["agentview_image"], 0), 1))
                             agent_view, wrist_view = obs['agentview_image'], obs['robot0_eye_in_hand_image']
                             
                             # get action and denorm
-                            action = policy.get_action([agent_view, wrist_view], env['env'].language_instruction)[0]  # TODO, use temporal ensembling
+                            action = policy.get_action([agent_view, wrist_view], env['env'].language_instruction, t=t, k=0.25)
                             action = action.reshape(-1)
                             
                             # step
@@ -111,7 +115,6 @@ class LIBEROEval(BaseEval):
                             ep_rews += reward
                             if done:
                                    break
-                     lang = env['env'].language_instruction
                      save_path = f'{self.base_dir}/{lang}.mp4'
                      imageio.mimsave(save_path, images, fps=30)
               avg_succ_rate = ep_rews / len(self.env) / self.num_episodes
