@@ -10,6 +10,9 @@ from BearRobot.utils.evaluation.base_eval import BaseEval
 from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.utils.logger.base_log import BaseLogger
 
+from tqdm import tqdm
+import imageio
+
 EPS = 1e-5
 benchmark_dict = benchmark.get_benchmark_dict()
 
@@ -39,6 +42,14 @@ class LIBEROEval(BaseEval):
               self.rank = rank
               if self.rank == 0:
                      self._init_env()
+                     self._make_dir()
+                     
+       def _make_dir(self):
+              task_suite_name = self.task_suite_name
+              path = 'evaluation_results/results/libero/' + task_suite_name
+              if not os.path.exists(path):
+                     os.makedirs(path)
+              self.base_dir = path
        
        def _init_env(self):
               self.env = []
@@ -58,14 +69,10 @@ class LIBEROEval(BaseEval):
                      }
                      env = OffScreenRenderEnv(**env_args)
                      env.seed(self.seed + 100)
-                     env.reset()
-                     init_states = self.task_suite.get_task_init_states(task_id) # for benchmarking purpose, we fix the a set of initial states
-                     init_state_id = 0
-                     obs = env.set_init_state(init_states[init_state_id])
                      
                      temp_dict = {}
                      temp_dict['env'] = env
-                     temp_dict['obs'] = obs
+                     temp_dict['task_id'] = task_id
                      
                      self.env.append(temp_dict)
        
@@ -84,9 +91,15 @@ class LIBEROEval(BaseEval):
               """
               ep_rews = 0
               for env in self.env:
-                     obs = env['obs']
+                     env['env'].reset()
+                     init_states = self.task_suite.get_task_init_states(env['task_id']) # for benchmarking purpose, we fix the a set of initial states
+                     init_state_id = 0
+                     obs = env['env'].set_init_state(init_states[init_state_id])
+                     
+                     images = []
                      for _ in range(200):
                             # get image
+                            images.append(np.flip(np.flip(obs["agentview_image"], 0), 1))
                             agent_view, wrist_view = obs['agentview_image'], obs['robot0_eye_in_hand_image']
                             
                             # get action and denorm
@@ -98,6 +111,9 @@ class LIBEROEval(BaseEval):
                             ep_rews += reward
                             if done:
                                    break
+                     lang = env['env'].language_instruction
+                     save_path = f'{self.base_dir}/{lang}.mp4'
+                     imageio.mimsave(save_path, images, fps=30)
               avg_succ_rate = ep_rews / len(self.env) / self.num_episodes
               print("Average success rate:", avg_succ_rate)
               return avg_succ_rate
@@ -108,7 +124,7 @@ class LIBEROEval(BaseEval):
               """
               rews = []
               policy.eval()
-              for _ in range(self.num_episodes):
+              for _ in tqdm(range(self.num_episodes), desc="Evaluating..."):
                      rews.append(self._rollout(policy))
               eval_rewards = sum(rews) / len(rews)
               metrics = {"eval/rewards": eval_rewards}
