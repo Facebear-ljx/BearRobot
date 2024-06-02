@@ -97,9 +97,9 @@ def build_ACT(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_
 def build_visual_diffsuion(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_path: str=None):
         kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
         model = VisualDiffusion(view_num=2,
-                                output_dim=28,
+                                output_dim=7 * kwargs['ac_num'],
                                 **kwargs).to(0)
-        agent = VLDDPM_BC(model, num_timesteps=25, schedule='vp') 
+        agent = VLDDPM_BC(model, num_timesteps=kwargs['T'], schedule=kwargs['beta']) 
         agent.get_statistics(statistics_path)
         agent.get_transform(kwargs['img_size'])
         return load_ckpt(agent, ckpt_path)
