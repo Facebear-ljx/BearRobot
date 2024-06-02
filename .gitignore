@@ -10,6 +10,8 @@ jinliang_ref/
 experiments/
 *.sh
 log/
-data/
+# data/
+dataset/
+*.json
 pretrained_model/
 *.egg-info/
