@@ -106,8 +106,13 @@ class LIBEROEval(BaseEval):
                             images.append(np.flip(np.flip(obs["agentview_image"], 0), 1))
                             agent_view, wrist_view = obs['agentview_image'], obs['robot0_eye_in_hand_image']
                             
+                            gripper_qpos = obs['robot0_gripper_qpos']
+                            eef_pos = obs['robot0_eef_pos']
+                            eef_quat = obs['robot0_eef_quat']
+                            state = np.concatenate([gripper_qpos, eef_pos, eef_quat], axis=-1) if policy.policy.s_dim > 0 else None
+                            
                             # get action and denorm
-                            action = policy.get_action([agent_view, wrist_view], env['env'].language_instruction, t=t, k=0.25)
+                            action = policy.get_action([agent_view, wrist_view], env['env'].language_instruction, state=state, t=t, k=0.25)
                             action = action.reshape(-1)
                             
                             # step
@@ -134,8 +139,7 @@ class LIBEROEval(BaseEval):
               self._log_results(metrics, steps)
               return eval_rewards
               
-              
-
-              
        
-       
+       def close_env(self):
+              for env in self.env:
+                     env['env'].close()
