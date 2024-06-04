@@ -4,13 +4,16 @@ import torch
 import numpy as np
 
 from libero.libero import benchmark, get_libero_path
-from libero.libero.envs import OffScreenRenderEnv
+from libero.libero.envs import OffScreenRenderEnv, SubprocVectorEnv
 
 from BearRobot.utils.evaluation.base_eval import BaseEval
 from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.utils.logger.base_log import BaseLogger
 
 from tqdm import tqdm
+
+import multiprocessing
+from functools import partial
 import imageio
 
 EPS = 1e-5
@@ -43,7 +46,7 @@ class LIBEROEval(BaseEval):
               
               self.rank = rank
               if self.rank == 0:
-                     self._init_env()
+                     # self._init_env()
                      self._make_dir()
                      
        def _make_dir(self):
@@ -87,21 +90,36 @@ class LIBEROEval(BaseEval):
                      # log the results to the logger
                      self.logger.log_metrics(metrics, steps)
        
-       def _rollout(self, policy: BaseAgent):
+       def _rollout(task_id, policy: BaseAgent, task_suite, task_suite_name, base_dir, seed=0, num_episodes=10, eval_horizon=300):
               """
-              rollout one episode and return the episode return
+              rollout several episodes and return the episodes mean success rate
               """
-              ep_rews = 0
-              for env in self.env:
-                     env['env'].reset()
-                     init_states = self.task_suite.get_task_init_states(env['task_id']) # for benchmarking purpose, we fix the a set of initial states
-                     init_state_id = 0
-                     obs = env['env'].set_init_state(init_states[init_state_id])
-                     lang = env['env'].language_instruction
-                     
+              task = task_suite.get_task(task_id)
+              task_description = task.language
+              task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
+              print(f"[info] retrieving task {task_id} from suite {task_suite_name}, the " + \
+                     f"language instruction is {task_description}, and the bddl file is {task_bddl_file}")
+
+              # step over the environment
+              env_args = {
+                     "bddl_file_name": task_bddl_file,
+                     "camera_heights": 128,
+                     "camera_widths": 128
+              }
+              env = OffScreenRenderEnv(**env_args)
+              env.seed(seed + 100)
+
+              obs = env.reset()
+              init_states = task_suite.get_task_init_states(task_id) # for benchmarking purpose, we fix the a set of initial states
+              init_state_id = env['task_id'] % init_states.shape[0]
+              obs = env.set_init_state(init_states[init_state_id])
+              lang = env.language_instruction
+              
+              for i in range(num_episodes):
+                     ep_rews = 0
                      images = []
-                     policy._init_action_chunking(self.eval_horizon)
-                     for t in tqdm(range(self.eval_horizon), desc=f'{lang}'):
+                     policy._init_action_chunking(eval_horizon)
+                     for t in tqdm(range(eval_horizon), desc=f'{lang}'):
                             # get image
                             images.append(np.flip(np.flip(obs["agentview_image"], 0), 1))
                             agent_view, wrist_view = obs['agentview_image'], obs['robot0_eye_in_hand_image']
@@ -112,17 +130,18 @@ class LIBEROEval(BaseEval):
                             state = np.concatenate([gripper_qpos, eef_pos, eef_quat], axis=-1)
                             
                             # get action and denorm
-                            action = policy.get_action([agent_view, wrist_view], env['env'].language_instruction, state=state, t=t, k=0.25)
+                            action = policy.get_action([agent_view, wrist_view], env.language_instruction, state=state, t=t, k=0.25)
                             action = action.reshape(-1)
                             
                             # step
-                            obs, reward, done, info = env['env'].step(action)
+                            obs, reward, done, info = env.step(action)
                             ep_rews += reward
                             if done:
                                    break
-                     save_path = f'{self.base_dir}/{lang}.mp4'
-                     imageio.mimsave(save_path, images, fps=30)
-              avg_succ_rate = ep_rews / len(self.env) / self.num_episodes
+                     save_path = f'{base_dir}/{lang}.mp4'
+
+              imageio.mimsave(save_path, images, fps=50)
+              avg_succ_rate = ep_rews / num_episodes
               print("Average success rate:", avg_succ_rate)
               return avg_succ_rate
        
@@ -130,10 +149,22 @@ class LIBEROEval(BaseEval):
               """
               rollout several episodes and log the mean episode return
               """
-              rews = []
               policy.eval()
-              for _ in tqdm(range(self.num_episodes), desc="Evaluating..."):
-                     rews.append(self._rollout(policy))
+              
+              # multiprocess evaluation
+              rollout_patial = partial(self._rollout, 
+                                       policy=policy, 
+                                       task_suite=self.task_suite, 
+                                       task_suite_name=self.task_suite_name, 
+                                       base_dir=self.base_dir, 
+                                       seed=self.seed, 
+                                       num_episodes=self.num_episodes, 
+                                       eval_horizon=self.eval_horizon)
+              pool = multiprocessing.Pool(processes=len(self.task_suite.tasks))
+              rews = pool.map(rollout_patial, list(range(len(self.task_suite.tasks))))
+              pool.close()
+              pool.join()
+
               eval_rewards = sum(rews) / len(rews)
               metrics = {"eval/rewards": eval_rewards}
               self._log_results(metrics, steps)
