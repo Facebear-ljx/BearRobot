@@ -68,16 +68,24 @@ def wandb_yaml2dict(ckpt_path, wandb_name: str=None, wandb_path: str=None):
 
 
 def load_ckpt(agent, ckpt_path):
-        os.environ["MASTER_ADDR"] = "localhost"
-        os.environ["MASTER_PORT"] = '12346'
-        torch.cuda.set_device(0)
-        torch.distributed.init_process_group(backend='nccl', rank=0, world_size=1)
-        agent.policy = DDP(agent.policy, device_ids=[0], find_unused_parameters=False)
+        from collections import OrderedDict
+        
+        # os.environ["MASTER_ADDR"] = "localhost"
+        # os.environ["MASTER_PORT"] = '12346'
+        # torch.cuda.set_device(0)
+        # torch.distributed.init_process_group(backend='nccl', rank=0, world_size=1)
+        # agent.policy = DDP(agent.policy, device_ids=[0], find_unused_parameters=False)
 
         ckpt = fileio.get(ckpt_path)
         with io.BytesIO(ckpt) as f:
                 ckpt = torch.load(f, map_location='cpu')
+        
+        new_ckpt = OrderedDict()
+        for key in ckpt['model'].keys():
+                new_key = key.replace(".module", '')
+                new_ckpt[new_key] = ckpt['model'][key]
 
+        ckpt['model'] = new_ckpt
         agent.load_state_dict(ckpt['model'])
         agent.eval()
         return agent.to(0)

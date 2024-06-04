@@ -378,11 +378,12 @@ class VLDDPM_BC(DDPM_BC):
               x = torch.randn(shape, device=self.device)
               cond = self.lang_encoder.embed_text(lang)
               
-              cond = cond.repeat(x.shape[0], 1)
-              imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
+              # cond = cond.repeat(x.shape[0], 1)
+              # imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
               
               for t in reversed(range(self.num_timesteps)):
-                     noise_pred = self.predict_noise(x, t, imgs, cond, state)
+                     t_tensor = torch.tensor([t]).unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
+                     noise_pred = self.predict_noise(x, t_tensor, imgs, cond, state)
                      x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), noise_pred, clip_sample=clip_sample)
               return x
        
@@ -392,18 +393,21 @@ class VLDDPM_BC(DDPM_BC):
             if not isinstance(imgs, torch.Tensor):
                 # transform lists to torch.Tensor
                 imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")).reshape(-1, self.img_size, self.img_size) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
+            else:
+                imgs = imgs.to('cuda')
+
+            B, F, V, C, H, W = imgs.shape
+            state = torch.from_numpy(state.astype(np.float32)).view(-1, self.policy.s_dim) if state is not None else None
+            state = ((state - self.s_mean) / self.s_std).to('cuda') if state is not None else None
             
-            state = torch.from_numpy(state.astype(np.float32)).view(1, -1) if state is not None else None
-            state = (state - self.s_mean) / self.s_std if state is not None else None
-            # state = None
-            action = self.ddpm_sampler((num, self.policy.module.output_dim), imgs, [lang], state, clip_sample=clip_sample).detach().cpu().view(-1)
-            action = action.view(-1, 7)
+            action = self.ddpm_sampler((B, self.policy.output_dim), imgs, [lang] * B, state, clip_sample=clip_sample).detach().cpu()
+            action = action.view(B, -1, 7)
             
-            N, _ = action.shape
-            a_max = self.a_max.repeat(N, 1)
-            a_min = self.a_min.repeat(N, 1)
-            a_mean = self.a_mean.repeat(N, 1)
-            a_std = self.a_std.repeat(N, 1)
+            B, N, D_a = action.shape
+            a_max = self.a_max.repeat(B, N, 1)
+            a_min = self.a_min.repeat(B, N, 1)
+            a_mean = self.a_mean.repeat(B, N, 1)
+            a_std = self.a_std.repeat(B, N, 1)
             
             action = (action + 1) * (a_max - a_min) / 2 + a_min
             action = self.get_ac_action(action.numpy(), t, k)

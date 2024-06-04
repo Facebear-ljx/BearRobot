@@ -54,8 +54,8 @@ class BaseAgent(nn.Module):
        def v_loss(self):
               pass
        
-       def _init_action_chunking(self, eval_horizon: int=600):
-              self.all_time_actions = np.zeros([eval_horizon, eval_horizon+self.ac_num, 7])
+       def _init_action_chunking(self, eval_horizon: int=600, num_samples: int=1):
+              self.all_time_actions = np.zeros([num_samples, eval_horizon, eval_horizon+self.ac_num, 7])
        
        # action_trunking
        def get_ac_action(self, actions, t: int, k: float=0.25):
@@ -67,14 +67,15 @@ class BaseAgent(nn.Module):
                   k (float, optional): the temperature of temporal ensemble. Defaults to 0.25.
               """
               if self.use_ac:
-                     actions = actions.reshape(-1, 7)
-                     self.all_time_actions[[t], t:t+self.ac_num] = actions
-                     actions_for_curr_step = self.all_time_actions[:, t]
-                     actions_populated = np.all(actions_for_curr_step != 0, axis = 1)
-                     actions_for_curr_step = actions_for_curr_step[actions_populated]
-                     exp_weights = np.exp(-k * np.arange(len(actions_for_curr_step)))
-                     exp_weights = (exp_weights / exp_weights.sum()).reshape(-1, 1)
-                     actions = (actions_for_curr_step * exp_weights).sum(axis=0)
+                     B, N, D = actions.shape
+                     # actions = actions.reshape(-1, 7)
+                     self.all_time_actions[:, [t], t:t+self.ac_num] = np.expand_dims(actions, axis=1)   # B, horizon, horizon+ac_num, 7
+                     actions_for_curr_step = self.all_time_actions[:, :, t]  # B, horizon, 7
+                     actions_populated = np.all(actions_for_curr_step != 0, axis=-1)  # B, horizon
+                     actions_for_curr_step = actions_for_curr_step[actions_populated].reshape(B, -1, D)  # B, N, 7
+                     exp_weights = np.exp(-k * np.arange(actions_for_curr_step.shape[1]))  # N, 1
+                     exp_weights = (exp_weights / exp_weights.sum()).reshape(1, -1, 1)
+                     actions = (actions_for_curr_step * exp_weights).sum(axis=1)
                      return actions
               else:
                      return actions
