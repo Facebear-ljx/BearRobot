@@ -45,15 +45,14 @@ class LIBEROEval(BaseEval):
               self.seed = seed
               
               self.rank = rank
-              if self.rank == 0:
-                     self._make_dir()
                      
-       def _make_dir(self):
-              task_suite_name = self.task_suite_name
-              path = 'evaluation_results/results/libero/' + task_suite_name
-              if not os.path.exists(path):
-                     os.makedirs(path)
-              self.base_dir = path
+       def _make_dir(self, save_path):
+              if self.rank == 0:
+                     task_suite_name = self.task_suite_name
+                     path = os.path.join(save_path, task_suite_name)
+                     if not os.path.exists(path):
+                            os.makedirs(path)
+                     self.base_dir = path
        
        def _init_env(self, task_id: int=0):
               # get task information and env args
@@ -186,10 +185,12 @@ class LIBEROEval(BaseEval):
               imageio.mimsave(save_path, images, fps=fps)
               
        
-       def eval_episodes(self, policy: BaseAgent, steps: int):
+       def eval_episodes(self, policy: BaseAgent, steps: int, save_path: str):
               """
               rollout several episodes and log the mean episode return
               """
+              self._make_dir(save_path)
+              
               rews = []
               policy.eval()
               # for _ in tqdm(range(self.num_episodes), desc="Evaluating..."):

@@ -400,10 +400,18 @@ class VLDDPM_BC(DDPM_BC):
                 imgs = imgs.to('cuda')
 
             B, F, V, C, H, W = imgs.shape
-            state = torch.from_numpy(state.astype(np.float32)).view(-1, self.policy.s_dim) if state is not None else None
+            try:
+                   s_dim = self.policy.s_dim
+            except:
+                   s_dim = self.policy.module.s_dim
+            state = torch.from_numpy(state.astype(np.float32)).view(-1, s_dim) if state is not None else None
             state = ((state - self.s_mean) / self.s_std).to('cuda') if state is not None else None
             
-            action = self.ddpm_sampler((B, self.policy.output_dim), imgs, [lang] * B, state, clip_sample=clip_sample).detach().cpu()
+            try:
+                   output_dim = self.policy.output_dim
+            except:
+                   output_dim = self.policy.module.output_dim
+            action = self.ddpm_sampler((B, output_dim), imgs, [lang] * B, state, clip_sample=clip_sample).detach().cpu()
             action = action.view(B, -1, 7)
             
             B, N, D_a = action.shape

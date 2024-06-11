@@ -19,9 +19,9 @@ def basic_args():
        
        # save log parameters
        parser.add_argument('--save', default=False, type=boolean, help='save ckpt or not')
-       parser.add_argument('--save_path', default='experiments/rt1', type=str, help='ckpt save path')
+       parser.add_argument('--save_path', default='../experiments/rt1', type=str, help='ckpt save path')
        parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
-       parser.add_argument('--log_path', default='experiments/rt1', type=str, help='ckpt save path')
+       parser.add_argument('--log_path', default='../experiments/test', type=str, help='ckpt save path')
        parser.add_argument('--resume', default=None, type=str, help='resume path')
        parser.add_argument('--wandb', default=False, type=boolean, help='use wandb or not')
        

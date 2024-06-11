@@ -196,7 +196,7 @@ class BCTrainer:
                                    
                             # evaluation
                             if (step + 1) % self.args.eval_freq == 0:
-                                   self.evaluator.eval_episodes(self.agent, step)
+                                   self.evaluator.eval_episodes(self.agent, step, self.save_path)
               
               self.logger.finish()
        

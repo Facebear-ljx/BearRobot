@@ -100,7 +100,7 @@ def main(args):
        agent.get_transform(img_size=0)
        
        # evaluator
-       evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger)
+       evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger, rank=global_rank)
        
        # trainer
        test_trainer = BCTrainer(agent, 
