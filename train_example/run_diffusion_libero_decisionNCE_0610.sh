@@ -5,7 +5,7 @@ torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_decis
     --algo_name 'dnce diffusion visual motor' \
     --ddp True \
     --mm_encoder DecisionNCE-T \
-    --ft_mmencoder True \
+    --ft_mmencoder False \
     --film_fusion False \
     --ac_num 6 \
     --norm minmax \

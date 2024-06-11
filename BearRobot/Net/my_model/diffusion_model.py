@@ -8,7 +8,7 @@ import numpy as np
 from BearRobot.Net.basic_net.mlp import MLP, MLPResNet
 from BearRobot.Net.basic_net.resnet import ResNet
 from BearRobot.Net.my_model.FiLM import FiLM_layer
-
+from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_visual, DecisionNCE_lang
 
 # sinusoidal positional embeds
 class SinusoidalPosEmb(nn.Module):
@@ -333,6 +333,181 @@ class VisualDiffusion(nn.Module):
                      noise_pred = self.decoder(input_feature)
               return noise_pred  
 
+
+class VisualDiffusion_pretrain(nn.Module):
+       """
+       the diffusion model that uses pretrained mult-modal backbone
+       """
+       def __init__(
+              self, 
+              view_num: int=2,
+              output_dim: int=7,  # a dim
+              cond_dim: int=768,  # cond dim, if condition on s
+              s_dim: int=0,  # qpos_dim, use qpos when > 0 
+              hidden_dim: int=256,
+              num_blocks: int=3,
+              time_dim: int=32,
+              time_hidden_dim: int=256,
+              mm_encoder: str='DecionNCE-T',
+              ft_mmencoder: bool=True,
+              ac_fn: str='mish',
+              time_embed: str='learned',
+              film_fusion: bool=False,
+              encode_s: bool=False,
+              encode_a: bool=False,
+              device: str='cpu',
+              *args,
+              **kwargs
+       ):
+              """this is a vision-language diffusion model for robotics control, but the vision-backbone is pretrained by DeicionNCE/LIV/R3M
+              now, we only support DecisionNCE pretrain
+              
+              Args:
+                  output_dim (int, optional): the action dim. Defaults to 7.
+                  cond_dim (int, optional): the conditional (language embed) information dim. Defaults to 768 (t5 embed dim).
+                  s_dim (int, optional): qpos_dim, use qpos when > 0.
+                  hidden_dim (int, optional): decoder hidden dim. Defaults to 256.
+                  num_blocks (int, optional): decoder block num. Defaults to 3.
+                  time_dim (int, optional): time embedding dim. Defaults to 32.
+                  time_hidden_dim (int, optional): time encoder dim. Defaults to 256.
+                  mm_encoder (str, optional): multi-modal encoder name. Defaults to 'DecisionNCE-T'.
+                  ft_mmencoder (bool, optional): further finetune the multi-modal encoder. Defaults to True.
+                  norm_type (str, optional): vision backbone norm type. Defaults to "bn".
+                  pooling_type (str, optional): vision backbone pooling type. Defaults to 'avg'.
+                  add_spatial_coordinates (bool, optional): add spatial coordinates to the image. Defaults to False.
+                  ac_fn (str, optional): decoder activation. Defaults to 'mish'.
+                  time_embed (str, optional): learned or fixed time embedding. Defaults to 'learned'.
+                  film_fusion (bool, optional): use film fusion for decoder. Defaults to False.
+                  device (str, optional): cpu or cuda. Defaults to 'cpu'.
+              """              
+              super().__init__()
+
+              self.output_dim = output_dim
+              self.ft_mmencoder = ft_mmencoder
+              self.cond_dim = cond_dim
+
+              assert mm_encoder in ['DecisionNCE-T', 'DecisionNCE-P']  # now, we only support DecisionNCE pretrain
+              mm_encoder = DecisionNCE_encoder(mm_encoder, device=device) 
+              if not ft_mmencoder:
+                     # only train the decoder MLPResnet
+                     for n, p in mm_encoder.named_parameters():
+                            p.requires_grad = False
+
+              # visual encoder
+              self.visual_encoder =  DecisionNCE_visual(mm_encoder) 
+              self.visual_dim = 1024
+              self.img_size = 0
+
+              # language condition
+              self.lang_cond =  DecisionNCE_lang(mm_encoder) 
+              self.lang_dim = 1024
+              
+              # time embedding
+              if time_embed not in TIMEEMBED.keys():
+                     raise ValueError(f"Invalid time_embedding '{time_embed}'. Expected one of: {list(TIMEEMBED.keys())}")
+              self.time_process = TIMEEMBED[time_embed](1, time_dim)
+              self.time_encoder = MLP(time_dim, [time_hidden_dim], time_hidden_dim, ac_fn='mish')
+                        
+              # state encoder
+              self.encode_s, self.encode_a = encode_s, encode_a
+              self.film_fusion = film_fusion
+              self.state_encoder = nn.Linear(s_dim, hidden_dim) if self.encode_s and s_dim > 0 else None
+              s_dim = hidden_dim if self.encode_s and s_dim > 0 else s_dim
+              self.s_dim = s_dim
+              if self.film_fusion:
+                     # add image, state, time embedding as film condition to action decoder
+                     input_dim = output_dim
+                     self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
+                     
+                     cond_dim = self.visual_dim * view_num + time_hidden_dim + s_dim
+                     self.film_fusion_layer = nn.ModuleList()
+                     for name, child in self.decoder.named_children():
+                            if isinstance(child, nn.ModuleList):
+                                   for block in child:
+                                          feature_dim = block.hidden_dim
+                                          self.film_fusion_layer.append(FiLM_layer(cond_dim, feature_dim))
+              else:
+                     # simply concat image, state, time embedding and action as input to action decoder
+                     self.action_encoder = nn.Linear(output_dim, hidden_dim) if self.encode_a else None
+                     a_dim = hidden_dim if self.encode_a else output_dim
+
+                     # decoder
+                     input_dim = self.visual_dim * view_num + time_hidden_dim + s_dim + a_dim + self.lang_dim
+                     self.decoder = MLPResNet(num_blocks, input_dim, hidden_dim, output_dim, ac_fn, True, 0.1)
+              
+              self.device = device      
+              print("s_dim:", s_dim)
+              print("a_dim:", a_dim)
+              print("time_dim:", time_dim)
+
+       def forward_visual_feature(self, images: torch.Tensor):
+              # images shape [B, F, View, C, H, W]
+              B, F, V, C, H, W = images.shape
+              
+              # image feature
+              image_feature = images.view(B * F * V, C, H, W)
+              image_feature = self.visual_encoder(image_feature)
+              image_feature = image_feature.view(B, F * V * self.visual_dim)
+
+              return image_feature
+ 
+       
+       def forward(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, cond: list=None, state=None):
+              """_summary_
+
+              Args:
+                  xt (torch.Tensor): noisy action
+                  t (torch.Tensor): time step
+                  imgs (torch.Tensor): [Batch, Frames, Views, C, H, W], batch of frames of different views
+                  cond (list): language condition. Defaults to None.
+                  state (_type_, optional): robot arm state. Defaults to None.
+
+              Raises:
+                  NotImplementedError: _description_
+
+              Returns:
+                  torch.Tensor: predicted noise
+              """
+              # flatted xt
+              xt = xt.reshape([xt.shape[0], -1])
+              if self.s_dim > 0:
+                     state = state.reshape([state.shape[0], -1])
+                     s_feature = self.state_encoder(state) if self.encode_s else state
+              else:
+                     # do not use qpos feature
+                     s_feature = None
+              
+              # encode
+              if not isinstance(t, torch.Tensor):
+                     t = torch.tensor(t, device=self.device)
+              time_embedding = self.time_process(t.view(-1, 1))
+              time_embedding = self.time_encoder(time_embedding)
+              if cond is not None:
+                     image_feature = self.forward_visual_feature(imgs)
+                     lang_feature = self.lang_cond(cond)
+                     image_feature = image_feature
+                     lang_feature = lang_feature
+              else:
+                     raise NotImplementedError(f"cond must be given, not None")
+              
+              if self.film_fusion:
+                     # use film to inject the image+language+state feature to the decoder 
+                     output = self.decoder.dense1(xt)
+                     condition = torch.concat([image_feature, time_embedding, s_feature], dim=-1) if s_feature is not None else torch.concat([image_feature, time_embedding], dim=-1)
+                     for block, film_layer in zip(self.decoder.mlp_res_blocks, self.film_fusion_layer):
+                            output = block(output)
+                            output = film_layer(condition, output)
+                     noise_pred = self.decoder.dense2(self.decoder.ac_fn(output))
+                     return noise_pred
+              else:
+                     # just simply concat all the features together
+                     xt_feature = self.action_encoder(xt) if self.encode_a else xt
+                     input_feature = torch.concat([image_feature, lang_feature, time_embedding, xt_feature, s_feature], dim=-1) if s_feature is not None else torch.concat([image_feature, lang_feature, time_embedding, xt_feature], dim=-1)
+                     
+                     # decode
+                     noise_pred = self.decoder(input_feature)
+              return noise_pred         
+       
 
 # TODO, implement more customized diffusion model
     

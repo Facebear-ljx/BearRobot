@@ -298,11 +298,14 @@ class VLDDPM_BC(DDPM_BC):
        ):
               super().__init__(policy, beta, T, ac_num)
               
-              self.img_size = self.policy.img_size
-              
-              
-              assert text_encoder == 't5'
-              self.lang_encoder = T5Encoder(device=device)
+              # self.img_size = self.policy.img_size
+              assert text_encoder in ['t5', 'DecisionNCE-T', 'DecisionNCE-P']
+              if text_encoder == 't5':
+                     self.lang_encoder = T5Encoder(device=device)
+              elif text_encoder in ['DecisionNCE-T', 'DecisionNCE-P']:
+                     self.lang_encoder = None  # the language encoder is implemented in the policy
+              else:
+                     raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")
               self.device = device
               
@@ -314,7 +317,7 @@ class VLDDPM_BC(DDPM_BC):
               # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
               # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
               '''
-              text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
+              text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach() if self.lang_encoder is not None else texts
               loss = self.policy_loss(action_gt, images, text_emb, state)
               loss_dict = {"policy_loss": loss}
               return loss_dict
@@ -392,7 +395,7 @@ class VLDDPM_BC(DDPM_BC):
        def get_action(self, imgs, lang, state=None, num=1, t=1, k=0.25, clip_sample=True):
             if not isinstance(imgs, torch.Tensor):
                 # transform lists to torch.Tensor
-                imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")).reshape(-1, self.img_size, self.img_size) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
+                imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
             else:
                 imgs = imgs.to('cuda')
 

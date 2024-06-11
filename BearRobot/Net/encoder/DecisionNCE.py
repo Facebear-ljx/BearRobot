@@ -26,3 +26,30 @@ class DecisionNCE_encoder(nn.Module):
        def encode_lang(self, langs: list):
               lang_features = self.model.encode_text(langs)
               return lang_features
+
+
+class DecisionNCE_visual(nn.Module):
+       def __init__(
+              self,
+              mm_encoder: DecisionNCE_encoder,
+       ):
+              super().__init__()
+              self.mm_encoder = mm_encoder
+       
+       def forward(self, imgs: torch.Tensor):
+              image_features = self.mm_encoder.encode_image(imgs)
+              return image_features
+              
+              
+
+class DecisionNCE_lang(nn.Module):
+       def __init__(
+              self,
+              mm_encoder: DecisionNCE_encoder,
+       ):
+              super().__init__()
+              self.mm_encoder = mm_encoder
+              
+       def forward(self, langs: list):
+              lang_features = self.mm_encoder.encode_lang(langs)
+              return lang_features
