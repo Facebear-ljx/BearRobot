@@ -8,7 +8,7 @@ test.ipynb
 jinliang_ref/
 *.out
 experiments/
-*.sh
+.sh
 log/
 # data/
 dataset/

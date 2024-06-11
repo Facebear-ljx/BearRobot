@@ -1,0 +1,32 @@
+bs=64
+ws=2
+torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_example.py \
+    --dataset 'airkitchen' \
+    --algo_name 'diffusion visual motor' \
+    --ddp True \
+    --img_size 224 \
+    --visual_encoder resnet50 \
+    --visual_pretrain True \
+    --ft_vision True \
+    --film_fusion False \
+    --ac_num 4 \
+    --norm minmax \
+    --norm_type bn \
+    --add_spatial_coordinates False \
+    --discretize_actions False \
+    --encode_s False \
+    --encode_a False \
+    --s_dim 0 \
+    --batch_size $bs \
+    --world_size $ws \
+    --lr 0.0001 \
+    --val_freq 100000 \
+    --resume None \
+    --wandb True \
+    --steps 200000 \
+    --save True \
+    --save_freq 50000 \
+    --T 25 \
+    --save_path ../experiments/airkitchen/diffusion/ft_lisa_augmsk_bs64_lr1e4_0506 \
+    --log_path ../experiments/airkitchen/diffusion/ft_lisa_augmsk_bs64_lr1e4_0506 \
+    --port 2050 \

@@ -1,0 +1,32 @@
+bs=64
+ws=2
+torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_example.py \
+    --dataset 'libero30' \
+    --algo_name 'diffusion visual motor' \
+    --ddp True \
+    --img_size 128 \
+    --visual_encoder resnet34 \
+    --visual_pretrain False \
+    --ft_vision True \
+    --film_fusion False \
+    --ac_num 6 \
+    --norm minmax \
+    --norm_type bn \
+    --add_spatial_coordinates False \
+    --discretize_actions False \
+    --encode_s False \
+    --encode_a False \
+    --s_dim 9 \
+    --batch_size $bs \
+    --world_size $ws \
+    --lr 0.0003 \
+    --val_freq 10000000 \
+    --resume None \
+    --wandb True \
+    --steps 2000000 \
+    --save True \
+    --save_freq 20000 \
+    --T 25 \
+    --save_path ../experiments/libero/libero30/diffusion/resnet34_wstate_test_0610 \
+    --log_path ../experiments/libero/libero30/diffusion/resnet34_wstate_test_0610 \
+    --port 2050 \
