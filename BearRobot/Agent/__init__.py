@@ -10,7 +10,7 @@ from torch.nn.parallel import DistributedDataParallel as DDP
 from BearRobot.Agent import *
 from BearRobot.Agent.ddpm_bc import VLDDPM_BC
 from BearRobot.Agent.ACT import ACTAgent 
-from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
+from BearRobot.Net.my_model.diffusion_model import VisualDiffusion, VisualDiffusion_pretrain
 from BearRobot.Net.my_model.ACT_model import ACTModel
 
 
@@ -110,6 +110,16 @@ def build_visual_diffsuion(ckpt_path: str, statistics_path: str, wandb_name: str
         agent = VLDDPM_BC(model, T=kwargs['T'], beta=kwargs['beta'], ac_num=kwargs['ac_num']) 
         agent.get_statistics(statistics_path)
         agent.get_transform(kwargs['img_size'])
+        return load_ckpt(agent, ckpt_path)
+
+def build_visual_diffusion_mmpretrain(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_path: str=None):
+        kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
+        model = VisualDiffusion_pretrain(view_num=2,
+                                output_dim=7 * kwargs['ac_num'],
+                                **kwargs).to(0)
+        agent = VLDDPM_BC(model, T=kwargs['T'], beta=kwargs['beta'], ac_num=kwargs['ac_num'], text_encoder=kwargs['mm_encoder']) 
+        agent.get_statistics(statistics_path)
+        agent.get_transform(img_size=0)
         return load_ckpt(agent, ckpt_path)
 
 

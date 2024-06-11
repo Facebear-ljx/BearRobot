@@ -135,7 +135,7 @@ class LIBEROEval(BaseEval):
               for _ in tqdm(range(self.num_episodes), desc="Evaluating..."):
                      rews.append(self._rollout(policy))
               eval_rewards = sum(rews) / len(rews)
-              metrics = {"eval/rewards": eval_rewards}
+              metrics = {"eval/success_rate": eval_rewards}
               self._log_results(metrics, steps)
               return eval_rewards
               

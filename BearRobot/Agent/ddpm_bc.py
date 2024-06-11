@@ -379,7 +379,7 @@ class VLDDPM_BC(DDPM_BC):
               Return: [num_samples, D_a] samples
               """
               x = torch.randn(shape, device=self.device)
-              cond = self.lang_encoder.embed_text(lang)
+              cond = self.lang_encoder.embed_text(lang) if self.lang_encoder is not None else lang
               
               # cond = cond.repeat(x.shape[0], 1)
               # imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))

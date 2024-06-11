@@ -193,6 +193,10 @@ class BCTrainer:
                             # validation
                             if (step + 1) % self.args.val_freq == 0:
                                    self.validation(step)
+                                   
+                            # evaluation
+                            if (step + 1) % self.args.eval_freq == 0:
+                                   self.evaluator.eval_episodes(self.agent, step)
               
               self.logger.finish()
        

@@ -10,8 +10,9 @@ def basic_args():
        parser.add_argument('--dataset_name', default='bridge', help='choose your d4rl env or some realrobot dataset')
 
        # basic training argument
-       parser.add_argument('--steps', default=int(1e+6), type=float, help='train steps')
-       parser.add_argument('--val_freq', default=int(5e+3), type=float, help='val frequency')
+       parser.add_argument('--steps', default=int(1e+6), type=int, help='train steps')
+       parser.add_argument('--val_freq', default=int(5e+3), type=int, help='val frequency')
+       parser.add_argument('--eval_freq', default=100, type=int, help='evaluation frequency, deploy the agent in sim env to evaluate')
        parser.add_argument("--seed", default=42, type=int)  # Sets PyTorch and Numpy seeds
        parser.add_argument('--batch_size', default=16, type=int)
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')

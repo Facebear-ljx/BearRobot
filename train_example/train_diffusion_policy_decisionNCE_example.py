@@ -13,6 +13,7 @@ from BearRobot.utils.logger.tb_log import TensorBoardLogger as Logger
 from BearRobot.utils.net.initialization import boolean
 from BearRobot.utils import ddp
 from BearRobot.Trainer.trainer import BCTrainer
+from BearRobot.utils.evaluation.mp_libero_eval import LIBEROEval
 from BearRobot.config.basic_args import basic_args, diffusion_args
 from torch.nn.parallel import DistributedDataParallel as DDP
 
@@ -26,7 +27,7 @@ def get_args():
        # customize your argparser
        parser.add_argument('--frames', default=1, type=int, help='frames num input to the visual encoder')
        parser.add_argument('--mm_encoder', default='DecisionNCE-T', type=str, help='multimodal encoder, support DecisionNCE-T/P')
-       parser.add_argument('--ft_mmencoder', default=True, type=boolean, help='whether tune the multimodal encoder')
+       parser.add_argument('--ft_mmencoder', default=False, type=boolean, help='whether tune the multimodal encoder')
        
        parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
@@ -95,13 +96,18 @@ def main(args):
                                                  output_dim=int(7 * args.ac_num),
                                                  **kwargs).to(rank)
        agent = VLDDPM_BC(policy=visual_diffusion_policy, text_encoder=kwargs['mm_encoder'],**kwargs)      
-
+       agent.get_statistics(os.path.join(args.save_path, 'statistics.json'))
+       agent.get_transform(img_size=0)
+       
+       # evaluator
+       evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger)
+       
        # trainer
        test_trainer = BCTrainer(agent, 
                                 rt1dataloader, 
                                 val_g_dataloader, 
                                 wandb_logger, 
-                                None, 
+                                evaluator,
                                 num_steps=int(args.steps), 
                                 lr=args.lr, 
                                 device=rank,
