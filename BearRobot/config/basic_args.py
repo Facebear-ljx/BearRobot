@@ -17,7 +17,7 @@ def basic_args():
        parser.add_argument('--lr', default=1e-4, type=float, help='learning rate')
        
        # save log parameters
-       parser.add_argument('--save', default=True, type=boolean, help='save ckpt or not')
+       parser.add_argument('--save', default=False, type=boolean, help='save ckpt or not')
        parser.add_argument('--save_path', default='experiments/rt1', type=str, help='ckpt save path')
        parser.add_argument('--save_freq', default=int(1e+4), type=int, help='save ckpt frequency')
        parser.add_argument('--log_path', default='experiments/rt1', type=str, help='ckpt save path')
