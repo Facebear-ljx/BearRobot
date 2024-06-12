@@ -1,4 +1,5 @@
 import os
+import json
 from BearRobot.utils.logger.base_log import BaseLogger
 from torch.utils.tensorboard import SummaryWriter
 
@@ -35,6 +36,13 @@ class TensorBoardLogger(BaseLogger):
        if self.writer is not None:
               for key, value in metrics.items():
                      self.writer.add_scalar(key, value, step)
+                     
+    
+    def save_metrics(self, metrics: dict, step: int, save_path: str):
+           save_name = os.path.join(save_path, 'results.json')
+           with open(save_name, 'a+') as f:
+                  line = json.dumps(metrics)
+                  f.write(line+'\n')
 
     def finish(self):
        if self.writer is not None:

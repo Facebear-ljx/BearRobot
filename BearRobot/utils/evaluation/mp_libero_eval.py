@@ -11,6 +11,7 @@ from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.utils.logger.base_log import BaseLogger
 
 from tqdm import tqdm
+import json
 
 import multiprocessing
 from functools import partial
@@ -93,12 +94,16 @@ class LIBEROEval(BaseEval):
        
        def _log_results(self, metrics: dict, steps: int):
               if self.logger is None:
-                     # just print out and pass
+                     # just print out and save the results and pass
                      print(metrics)
-                     pass # TODO, implement the print function
+                     save_name = os.path.join(self.base_dir, 'results.json')
+                     with open(save_name, 'a+') as f:
+                            line = json.dumps(metrics)
+                            f.write(line+'\n')
               else:
                      # log the results to the logger
                      self.logger.log_metrics(metrics, steps)
+                     self.logger.save_metrics(metrics, steps, self.base_dir)
        
        def raw_obs_to_stacked_obs(self, obs, lang):
               env_num = len(obs)
@@ -160,8 +165,9 @@ class LIBEROEval(BaseEval):
                      eef_quat = obs['robot0_eef_quat']
                      state = np.concatenate([gripper_qpos, eef_pos, eef_quat], axis=-1)
                      
-                     # get action
-                     action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)
+                     # get action 
+                     action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)   # TODO find bug here!
+                     # action = np.zeros([self.num_episodes, 7])
                      action = action.reshape(self.num_episodes, -1)
                      
                      # step
@@ -176,7 +182,10 @@ class LIBEROEval(BaseEval):
               for k in range(self.num_episodes):
                      num_success += int(done[k])
               avg_succ_rate = num_success / self.num_episodes
-              print("Average success rate:", avg_succ_rate)
+             
+              metrics = {'task': lang,
+                         "succ_rate": avg_succ_rate}
+              self._log_results(metrics, self.step)
               
               env['env'].close()
               return avg_succ_rate
@@ -190,6 +199,7 @@ class LIBEROEval(BaseEval):
               rollout several episodes and log the mean episode return
               """
               self._make_dir(save_path)
+              self.step = steps
               
               rews = []
               policy.eval()
