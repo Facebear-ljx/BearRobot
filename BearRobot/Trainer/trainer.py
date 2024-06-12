@@ -196,8 +196,17 @@ class BCTrainer:
                                    
                             # evaluation
                             if (step + 1) % self.args.eval_freq == 0:
-                                   self.evaluator.eval_episodes(self.agent, step, self.save_path)
-              
+                                   if self.args.ddp:
+                                          evaluate = True if self.global_rank == 0 else False
+                                   else:
+                                          evaluate = True
+                                   
+                                   if evaluate:
+                                          self.evaluator.eval_episodes(self.agent, step, self.save_path) 
+                            
+                            if self.args.ddp:
+                                   torch.distributed.barrier()
+
               self.logger.finish()
        
        

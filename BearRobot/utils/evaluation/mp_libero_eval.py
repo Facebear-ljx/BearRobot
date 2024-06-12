@@ -183,8 +183,7 @@ class LIBEROEval(BaseEval):
                      num_success += int(done[k])
               avg_succ_rate = num_success / self.num_episodes
              
-              metrics = {'task': lang,
-                         "succ_rate": avg_succ_rate}
+              metrics = {f'sim/{self.task_suite_name}/{lang}': avg_succ_rate}
               self._log_results(metrics, self.step)
               
               env['env'].close()
@@ -207,8 +206,8 @@ class LIBEROEval(BaseEval):
               for task_id in tqdm(range(len(self.task_suite.tasks)), desc="Evaluating..."):
                      rews.append(self._rollout(policy, task_id))
               eval_rewards = sum(rews) / len(rews)
-              metrics = {"eval/succ_rate": eval_rewards}
-              self._log_results(metrics, steps)
+              metrics = {f'sim/{self.task_suite_name}/all': eval_rewards}
+              self._log_results(metrics, self.step)
               return eval_rewards
               
        

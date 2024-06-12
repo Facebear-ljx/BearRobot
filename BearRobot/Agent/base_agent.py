@@ -101,14 +101,17 @@ class BaseAgent(nn.Module):
               print(print_dict)
 
 
-       def get_transform(self, img_size):
+       def get_transform(self, img_size=0, transform_list=None):
               from PIL import Image
               from torchvision import transforms
-              transform_list  = [
-                     transforms.ToTensor(),
-                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-              ]
-              if img_size != 0:
-                     transform_list.insert(0, transforms.CenterCrop(img_size))
-                     transform_list.insert(0, transforms.Resize(256, interpolation=Image.BICUBIC))       
+              if transform_list is None:
+                     transform_list  = [
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                     ]
+                     if img_size != 0:
+                            transform_list.insert(0, transforms.CenterCrop(img_size))
+                            transform_list.insert(0, transforms.Resize(256, interpolation=Image.BICUBIC))
+              else:
+                     transform_list = transform_list
               self.transform = transforms.Compose(transform_list)

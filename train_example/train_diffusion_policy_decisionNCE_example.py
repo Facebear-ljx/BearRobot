@@ -59,25 +59,23 @@ def main(args):
        # init ddp
        global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
        kwargs['device'] = rank
-       
-       # save 
-       if args.save and global_rank==0:
-              # your ckpt save path
-              save_path = args.save_path
-              if not os.path.exists(save_path):
-                     os.makedirs(save_path)
-       else:
-              save_path = None
 
        # logger
        wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
-
+       
+       import torchvision.transforms as T
+       transform_list  = [
+              T.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
+              T.ToTensor(),
+       ]
+       
        # dataset and dataloader
        view_list = ['D435_image', 'wrist_image']
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
               datalist=['/home/dodo/ljx/BearRobot/data/libero/libero30-ac.json'],
               view_list=view_list,
+              transform_list=transform_list,
               **kwargs
        )
        
@@ -85,11 +83,22 @@ def main(args):
               datalist=['/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json'],
               view_list=view_list,
               statistics=statistics,
+              transform_list=transform_list,
               **kwargs              
        )
 
-       with open(os.path.join(args.save_path, 'statistics.json'), 'w') as f:
-              json.dump(statistics, f)
+       # save 
+       if args.save and global_rank==0:
+              # your ckpt save path
+              save_path = args.save_path
+              if not os.path.exists(save_path):
+                     os.makedirs(save_path)
+              
+              # save the statistics for training dataset
+              with open(os.path.join(save_path, 'statistics.json'), 'w') as f:
+                     json.dump(statistics, f)
+       else:
+              save_path = None
 
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion_pretrain(view_num=len(view_list), 
@@ -97,7 +106,7 @@ def main(args):
                                                  **kwargs).to(rank)
        agent = VLDDPM_BC(policy=visual_diffusion_policy, text_encoder=kwargs['mm_encoder'],**kwargs)      
        agent.get_statistics(os.path.join(args.save_path, 'statistics.json'))
-       agent.get_transform(img_size=0)
+       agent.get_transform(img_size=0, transform_list=transform_list)
        
        # evaluator
        evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger, rank=global_rank)

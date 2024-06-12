@@ -443,6 +443,7 @@ class AIRKitchenDataset():
               ac_num: int=4,
               statistics: dict=None,
               mask_aug: bool=False,  # True for IVM training, False for normal training
+              transform_list: list=None,  # e.g. [transforms.RandomResizedCrop(224, scale=(0.75, 1), interpolation=Image.BICUBIC)], you can feed your own transform
        ):
               self.base_dir = base_dir
               self.img_size = img_size
@@ -460,13 +461,16 @@ class AIRKitchenDataset():
                      
               self._statistics(statistics)
               
-              transform_list  = [
-                     transforms.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
-                     transforms.ToTensor(),
-                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-              ]
-              if self.img_size != 0:
-                     transform_list.insert(0, transforms.RandomResizedCrop(self.img_size, scale=(0.75, 1), interpolation=Image.BICUBIC))       
+              if transform_list == None:
+                     transform_list  = [
+                            transforms.ColorJitter(0.2, [0.8, 1.2], [0.8, 1.2], 0.1),
+                            transforms.ToTensor(),
+                            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                     ]  
+                     if self.img_size != 0:
+                            transform_list.insert(0, transforms.RandomResizedCrop(self.img_size, scale=(0.75, 1), interpolation=Image.BICUBIC))     
+              else:
+                     transform_list = transform_list  
               self.transform = transforms.Compose(transform_list)
 
        def _statistics(self, statistics=None):
@@ -619,6 +623,7 @@ def AIRKitchenDataLoader(
        num_workers: int=8,
        pin_mem: bool=True,
        ac_num: int=4,
+       transform_list: list=None,
        **kwargs,
 ):
        dataset = AIRKitchenDataset(base_dir=base_dir,
@@ -628,7 +633,8 @@ def AIRKitchenDataLoader(
                                    view_list=view_list, 
                                    discretize_actions=discretize_actions, 
                                    norm=norm,
-                                   ac_num=ac_num)
+                                   ac_num=ac_num,
+                                   transform_list=transform_list)
        
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()

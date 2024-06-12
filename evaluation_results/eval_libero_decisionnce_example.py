@@ -10,7 +10,7 @@ def main():
     policy = build_visual_diffusion_mmpretrain(ckpt_path, statistic_path)
     evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10)
 
-    evaluator.eval_episodes(policy, 0)
+    evaluator.eval_episodes(policy, 0, save_path='/home/dodo/ljx/BearRobot/experiments/libero/libero30/diffusion_dnce/test_0611/')
 
 if __name__ == '__main__':
     main()
