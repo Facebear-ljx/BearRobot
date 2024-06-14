@@ -48,5 +48,5 @@ for dataset in tqdm(dataset_lists):
                 count += 1
 
 print('done, data number:', count)
-with open("/home/dodo/ljx/BearRobot/data/libero/libero30-ac.json", 'w') as f:
+with open("/home/dodo/ljx/BearRobot/data/libero/libero130-ac.json", 'w') as f:
     json.dump(data, f, indent=4)

@@ -1,6 +1,7 @@
 import os
 
 import torch
+import torchvision.transforms as transforms
 import numpy as np
 
 from libero.libero import benchmark, get_libero_path
@@ -19,6 +20,14 @@ import imageio
 
 EPS = 1e-5
 benchmark_dict = benchmark.get_benchmark_dict()
+
+def has_normalize(transform):
+       if isinstance(transform, transforms.Compose):
+              for t in transform.transforms:
+                     if isinstance(t, transforms.Normalize):
+                            return True
+       return False
+
 
 class LIBEROEval(BaseEval):
        def __init__(
@@ -125,15 +134,16 @@ class LIBEROEval(BaseEval):
               
               return data     
        
-       def np_image_to_tensor(self, image: np.array):
+       def np_image_to_tensor(self, image: np.array, normalize_img: bool):
               B, H, W, C = image.shape
               image = image / 255. if image.max() > 10 else image
               image = torch.from_numpy(image).permute(0, 3, 1, 2).to(torch.float32)  # B, C, H, W
               
-              norm_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1).repeat(B, 1, 1, 1)  # B, C, 1, 1
-              norm_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, 3, 1, 1).repeat(B, 1, 1, 1)
-              
-              image = (image - norm_mean) / norm_std
+              if normalize_img:
+                     norm_mean = torch.tensor([0.485, 0.456, 0.406]).reshape(1, 3, 1, 1).repeat(B, 1, 1, 1)  # B, C, 1, 1
+                     norm_std = torch.tensor([0.229, 0.224, 0.225]).reshape(1, 3, 1, 1).repeat(B, 1, 1, 1)
+                     
+                     image = (image - norm_mean) / norm_std
               return image  # B, C, H, W
 
        def _rollout(self, policy: BaseAgent, task_id: int=0):
@@ -151,8 +161,10 @@ class LIBEROEval(BaseEval):
                      ## image
                      data = self.raw_obs_to_stacked_obs(obs, lang)
                      obs, lang = data['obs'], data['lang']
-                     agent_view = self.np_image_to_tensor(obs['agentview_image']).unsqueeze(1)
-                     wrist_view = self.np_image_to_tensor(obs['robot0_eye_in_hand_image']).unsqueeze(1)
+                     
+                     normalize_img = has_normalize(policy.transform)
+                     agent_view = self.np_image_to_tensor(obs['agentview_image'], normalize_img).unsqueeze(1)
+                     wrist_view = self.np_image_to_tensor(obs['robot0_eye_in_hand_image'], normalize_img).unsqueeze(1)
                      image_input = torch.cat([agent_view, wrist_view], dim=1).unsqueeze(1)
                      
                      ### record the video
@@ -163,11 +175,15 @@ class LIBEROEval(BaseEval):
                      gripper_qpos = obs['robot0_gripper_qpos']
                      eef_pos = obs['robot0_eef_pos']
                      eef_quat = obs['robot0_eef_quat']
-                     state = np.concatenate([gripper_qpos, eef_pos, eef_quat], axis=-1)
+                     
+                     try:
+                            s_dim = policy.policy.s_dim
+                     except:
+                            s_dim = policy.policy.module.s_dim
+                     state = np.concatenate([gripper_qpos, eef_pos, eef_quat], axis=-1) if s_dim > 0 else None
                      
                      # get action 
-                     action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)   # TODO find bug here!
-                     # action = np.zeros([self.num_episodes, 7])
+                     action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)   # TODO find ddp bug here!
                      action = action.reshape(self.num_episodes, -1)
                      
                      # step
