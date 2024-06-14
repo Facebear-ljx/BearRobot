@@ -491,7 +491,12 @@ class VisualDiffusion_pretrain(nn.Module):
               time_embedding = self.time_encoder(time_embedding)
               if cond is not None:
                      image_feature = self.forward_visual_feature(imgs)
-                     lang_feature = self.lang_cond(cond)
+                     if isinstance(cond, list):
+                            lang_feature = self.lang_cond(cond)
+                     elif isinstance(cond, torch.Tensor):
+                            lang_feature = cond
+                     else:
+                            raise ValueError(f"Invalid cond type: {type(cond)}")
                      image_feature = image_feature
                      lang_feature = lang_feature
               else:

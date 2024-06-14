@@ -2,7 +2,7 @@ bs=64
 ws=2
 export CUDA_VISIBLE_DEVICES=1
 export WANDB_API_KEY=cfbf81ce9bd7daca9d32f4bd1dbf26e8c93310c3
-torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_decisionNCE_example.py \
+torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_decisionNCE_example_libero.py \
     --seed 42 \
     --dataset 'libero_goal' \
     --algo_name 'dnce diffusion visual motor' \

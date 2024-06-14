@@ -7,8 +7,8 @@ torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_examp
     --algo_name 'diffusion visual motor' \
     --ddp False \
     --img_size 128 \
-    --visual_encoder resnet34 \
-    --visual_pretrain False \
+    --visual_encoder resnet50 \
+    --visual_pretrain True \
     --text_encoder DecisionNCE-T \
     --ft_vision True \
     --film_fusion False \
