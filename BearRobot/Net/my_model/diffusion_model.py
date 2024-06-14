@@ -390,8 +390,13 @@ class VisualDiffusion_pretrain(nn.Module):
               mm_encoder = DecisionNCE_encoder(mm_encoder, device=device) 
               if not ft_mmencoder:
                      # only train the decoder MLPResnet
-                     for n, p in mm_encoder.named_parameters():
+                      for n, p in mm_encoder.named_parameters():
                             p.requires_grad = False
+              else:
+                     # TODO, support other pretrained encoder
+                     mm_encoder.model.requires_grad_(False)
+                     mm_encoder.model.model.visual.requires_grad_(True)
+                     
 
               # visual encoder
               self.visual_encoder =  DecisionNCE_visual(mm_encoder) 

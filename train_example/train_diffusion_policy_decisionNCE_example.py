@@ -60,8 +60,6 @@ def main(args):
        global_rank, rank, _ = ddp.ddp_setup_universal(True, args)
        kwargs['device'] = rank
 
-       # logger
-       wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
        
        import torchvision.transforms as T
        transform_list  = [
@@ -78,14 +76,6 @@ def main(args):
               transform_list=transform_list,
               **kwargs
        )
-       
-       val_g_dataloader = AIRKitchenValDataLoader(
-              datalist=['/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json'],
-              view_list=view_list,
-              statistics=statistics,
-              transform_list=transform_list,
-              **kwargs              
-       )
 
        # save 
        if args.save and global_rank==0:
@@ -100,6 +90,9 @@ def main(args):
        else:
               save_path = None
 
+       # logger
+       wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
+
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion_pretrain(view_num=len(view_list), 
                                                  output_dim=int(7 * args.ac_num),
@@ -109,12 +102,12 @@ def main(args):
        agent.get_transform(img_size=0, transform_list=transform_list)
        
        # evaluator
-       evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger, rank=global_rank)
+       evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=200, num_episodes=10, logger=wandb_logger, rank=global_rank)
        
        # trainer
        test_trainer = BCTrainer(agent, 
                                 rt1dataloader, 
-                                val_g_dataloader, 
+                                None, 
                                 wandb_logger, 
                                 evaluator,
                                 num_steps=int(args.steps), 

@@ -119,7 +119,12 @@ def build_visual_diffusion_mmpretrain(ckpt_path: str, statistics_path: str, wand
                                 **kwargs).to(0)
         agent = VLDDPM_BC(model, T=kwargs['T'], beta=kwargs['beta'], ac_num=kwargs['ac_num'], text_encoder=kwargs['mm_encoder']) 
         agent.get_statistics(statistics_path)
-        agent.get_transform(img_size=0)
+        
+        import torchvision.transforms as T
+        transform_list  = [
+              T.ToTensor(),
+        ]
+        agent.get_transform(img_size=0, transform_list=transform_list)
         return load_ckpt(agent, ckpt_path)
 
 
