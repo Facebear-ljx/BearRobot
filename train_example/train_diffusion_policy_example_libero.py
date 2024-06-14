@@ -25,11 +25,12 @@ import json
 def get_args():
        parser = basic_args()
        # customize your argparser
-       parser.add_argument('--img_size', default=224, type=int, help='image size')
+       parser.add_argument('--img_size', default=128, type=int, help='image size')
        parser.add_argument('--frames', default=1, type=int, help='frames num input to the visual encoder')
        parser.add_argument('--visual_encoder', default='resnet34', type=str, help='visual encoder backbone, support resnet 18/34/50')
        parser.add_argument('--visual_pretrain', default=False, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--ft_vision', default=False, type=boolean, help='whether tune the visual encoder')
+       parser.add_argument('--text_encoder', default='DecisionNCE-T', type=str, help='language encoder, support T5, DecisionNCE-T, DecisionNCE-P')
        
        parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')

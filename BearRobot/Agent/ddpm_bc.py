@@ -11,6 +11,7 @@ from PIL import Image
 from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
 from BearRobot.Net.my_model.t5 import T5Encoder
+from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang
 
 def extract(a, x_shape):
        '''
@@ -292,18 +293,19 @@ class VLDDPM_BC(DDPM_BC):
               beta: str='cosine',  
               T: int=5,
               ac_num: int=1,
-              text_encoder: str="t5",
+              text_encoder: str="T5",
               device = 'cuda',
               *args, **kwargs
        ):
               super().__init__(policy, beta, T, ac_num)
               
               # self.img_size = self.policy.img_size
-              assert text_encoder in ['t5', 'DecisionNCE-T', 'DecisionNCE-P']
-              if text_encoder == 't5':
+              assert text_encoder in ['T5', 'DecisionNCE-T', 'DecisionNCE-P']
+              if text_encoder == 'T5':
                      self.lang_encoder = T5Encoder(device=device)
               elif text_encoder in ['DecisionNCE-T', 'DecisionNCE-P']:
-                     self.lang_encoder = None  # the language encoder is implemented in the policy
+                     mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
+                     self.lang_encoder = DecisionNCE_lang(mm_encoder)
               else:
                      raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")

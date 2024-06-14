@@ -71,7 +71,7 @@ def main(args):
        view_list = ['D435_image', 'wrist_image']
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
-              datalist=['/home/dodo/ljx/BearRobot/data/libero/libero30-ac.json'],
+              datalist=['/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac.json'],
               view_list=view_list,
               transform_list=transform_list,
               **kwargs

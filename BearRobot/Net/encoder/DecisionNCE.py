@@ -23,7 +23,8 @@ class DecisionNCE_encoder(nn.Module):
               image_features = self.model.encode_image(imgs)
               return image_features
        
-       def encode_lang(self, langs: list):
+       @torch.no_grad()
+       def embed_text(self, langs: list):
               lang_features = self.model.encode_text(langs)
               return lang_features
 
@@ -42,14 +43,15 @@ class DecisionNCE_visual(nn.Module):
               
               
 
-class DecisionNCE_lang(nn.Module):
+class DecisionNCE_lang():
        def __init__(
               self,
               mm_encoder: DecisionNCE_encoder,
        ):
               super().__init__()
               self.mm_encoder = mm_encoder
-              
-       def forward(self, langs: list):
-              lang_features = self.mm_encoder.encode_lang(langs)
+       
+       @torch.no_grad()
+       def embed_text(self, langs: list):
+              lang_features = self.mm_encoder.embed_text(langs)
               return lang_features

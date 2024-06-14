@@ -9,6 +9,7 @@ from BearRobot.Net.basic_net.mlp import MLP, MLPResNet
 from BearRobot.Net.basic_net.resnet import ResNet
 from BearRobot.Net.my_model.FiLM import FiLM_layer
 from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_visual, DecisionNCE_lang
+from . import LANG_EMB_DIM
 
 # sinusoidal positional embeds
 class SinusoidalPosEmb(nn.Module):
@@ -145,7 +146,7 @@ class VisualDiffusion(nn.Module):
               img_size: int=224,  # a dim
               view_num: int=2,
               output_dim: int=7,  # a dim
-              cond_dim: int=768,  # cond dim, if condition on s
+              text_encoder: str='T5',  # language encoder name, used for condition dim
               s_dim: int=0,  # qpos_dim, use qpos when > 0 
               hidden_dim: int=256,
               num_blocks: int=3,
@@ -192,6 +193,7 @@ class VisualDiffusion(nn.Module):
               self.img_size = img_size
               self.output_dim = output_dim
               self.ft_vision = ft_vision
+              cond_dim = LANG_EMB_DIM[text_encoder]
               self.cond_dim = cond_dim
               
               # visual encoder

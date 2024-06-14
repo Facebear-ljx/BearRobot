@@ -1,11 +1,14 @@
 bs=64
 ws=2
-torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_decisionNCE_example.py \
-    --dataset 'libero30' \
+export CUDA_VISIBLE_DEVICES=1
+export WANDB_API_KEY=cfbf81ce9bd7daca9d32f4bd1dbf26e8c93310c3
+torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_decisionNCE_example.py \
+    --seed 42 \
+    --dataset 'libero_goal' \
     --algo_name 'dnce diffusion visual motor' \
-    --ddp True \
+    --ddp False \
     --mm_encoder DecisionNCE-T \
-    --ft_mmencoder False \
+    --ft_mmencoder True \
     --film_fusion False \
     --ac_num 6 \
     --norm minmax \
@@ -17,12 +20,13 @@ torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_decis
     --world_size $ws \
     --lr 0.0003 \
     --val_freq 10000000 \
+    --eval_freq 25000 \
     --resume None \
     --wandb True \
     --steps 2000000 \
     --save True \
-    --save_freq 20000 \
+    --save_freq 25000 \
     --T 25 \
-    --save_path ../experiments/libero/libero30/diffusion_dnce/test_0611 \
-    --log_path ../experiments/libero/libero30/diffusion_dnce/test_0611 \
-    --port 2050 \
+    --save_path ../experiments/libero/libero_goal/diffusion_dnce/test_0613_ftimg \
+    --log_path ../experiments/libero/libero_goal/diffusion_dnce/test_0613_ftimg \
+    --port 2052 \

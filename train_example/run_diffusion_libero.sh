@@ -1,12 +1,15 @@
 bs=64
 ws=2
-torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_example.py \
-    --dataset 'libero30' \
+export CUDA_VISIBLE_DEVICES=1
+export WANDB_API_KEY=cfbf81ce9bd7daca9d32f4bd1dbf26e8c93310c3
+torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_example_libero.py \
+    --dataset 'libero_goal' \
     --algo_name 'diffusion visual motor' \
-    --ddp True \
+    --ddp False \
     --img_size 128 \
     --visual_encoder resnet34 \
     --visual_pretrain False \
+    --text_encoder DecisionNCE-T \
     --ft_vision True \
     --film_fusion False \
     --ac_num 6 \
@@ -21,12 +24,13 @@ torchrun --standalone --nnodes=1 --nproc-per-node=2 train_diffusion_policy_examp
     --world_size $ws \
     --lr 0.0003 \
     --val_freq 10000000 \
+    --eval_freq 25000 \
     --resume None \
     --wandb True \
     --steps 2000000 \
     --save True \
-    --save_freq 20000 \
+    --save_freq 25000 \
     --T 25 \
-    --save_path ../experiments/libero/libero30/diffusion/resnet34_wstate_test_0610 \
-    --log_path ../experiments/libero/libero30/diffusion/resnet34_wstate_test_0610 \
+    --save_path ../experiments/libero/libero_goal/diffusion/resnet34_wstate_0613 \
+    --log_path ../experiments/libero/libero_goal/diffusion/resnet34_wstate_0613 \
     --port 2050 \
