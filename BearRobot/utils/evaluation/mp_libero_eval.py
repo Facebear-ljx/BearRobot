@@ -3,6 +3,7 @@ import os
 import torch
 import torchvision.transforms as transforms
 import numpy as np
+import random
 
 from libero.libero import benchmark, get_libero_path
 from libero.libero.envs import OffScreenRenderEnv, SubprocVectorEnv
@@ -10,6 +11,8 @@ from libero.libero.envs import OffScreenRenderEnv, SubprocVectorEnv
 from BearRobot.utils.evaluation.base_eval import BaseEval
 from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.utils.logger.base_log import BaseLogger
+from BearRobot.utils.dataset.dataloader import openimage
+from data.libero.data_process import demo2frames
 
 from tqdm import tqdm
 import json
@@ -20,6 +23,7 @@ import imageio
 
 EPS = 1e-5
 benchmark_dict = benchmark.get_benchmark_dict()
+frame_length_dict = demo2frames.frame_counts_dict(json_name = 'libero_goal-ac.json')  # TODO args
 
 def has_normalize(transform):
        if isinstance(transform, transforms.Compose):
@@ -93,8 +97,32 @@ class LIBEROEval(BaseEval):
               init_state_id = np.arange(self.num_episodes) % init_states.shape[0]
               obs = env.set_init_state(init_states[init_state_id])
               
-              # return the environment
+              ### sample one begin and end image frame to construct image goal
+              # Generating paths for img_begin and img_end
+              task_name = task_description.replace(" ", "_") + "_demo"
+              demo_paths = demo2frames.get_demos_for_task(task_name, frame_length_dict)
+              demo_path = random.choice(demo_paths)
+
+              # eval with the beginning frame and the endding frame
               env_dict = {}
+              transform = transforms.ToTensor()
+              env_dict['img_begin'] = transform(openimage(os.path.join("libero/data_jpg/libero_goal/", demo_path, "image0/0.jpg")))
+              end_idx = frame_length_dict[demo_path] - 1 
+              env_dict['img_end'] = transform(openimage(os.path.join("libero/data_jpg/libero_goal/", demo_path, f"image0/{end_idx}.jpg")))
+
+              # eval with the random frames
+              # env_dict = {}
+              # frame_length = frame_length_dict[demo_path]
+              # frame_gap = 10
+              # begin_idx = 0
+              # begin_idx = torch.randint(0, frame_length - frame_gap, (1,)).item()
+              # base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/'
+              # transform = transforms.ToTensor()
+              # env_dict['img_begin'] = transform(openimage(os.path.join(base_dir,"libero/data_jpg/libero_goal/", demo_path, f"image0/{begin_idx}.jpg")))
+              # end_idx = torch.randint(begin_idx, frame_length, (1,)).item()
+              # env_dict['img_end'] = transform(openimage(os.path.join(base_dir,"libero/data_jpg/libero_goal/", demo_path, f"image0/{end_idx}.jpg")))
+
+              # return the environment
               env_dict['env'] = env
               env_dict['language_instruction'] = task_description
               env_dict['obs'] = obs
@@ -146,13 +174,15 @@ class LIBEROEval(BaseEval):
                      image = (image - norm_mean) / norm_std
               return image  # B, C, H, W
 
-       def _rollout(self, policy: BaseAgent, task_id: int=0):
+       def _rollout(self, policy: BaseAgent, task_id: int=0, img_goal=False):
               """
               rollout one episode and return the episode return
               """
               env = self._init_env(task_id)
               lang = env['language_instruction']
               obs = env['obs']
+              img_begin = env['img_begin']
+              img_end = env['img_end']
               policy._init_action_chunking(self.eval_horizon, self.num_episodes)
               
               images = []
@@ -181,9 +211,13 @@ class LIBEROEval(BaseEval):
                      except:
                             s_dim = policy.policy.module.s_dim
                      state = np.concatenate([gripper_qpos, eef_pos, eef_quat], axis=-1) if s_dim > 0 else None
-                     
-                     # get action 
-                     action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)   # TODO find ddp bug here!
+
+                     # get action using img_begin and img_end embedding difference
+                     if img_goal:
+                            action = policy.get_action(image_input, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end)
+                     else:
+                            action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)
+                     # reshape
                      action = action.reshape(self.num_episodes, -1)
                      
                      # step
@@ -192,7 +226,6 @@ class LIBEROEval(BaseEval):
                             break
               save_path = f'{self.base_dir}/{lang}.mp4'
               self._save_video(save_path, images, done, fps=30)
-              # imageio.mimsave(save_path, images, fps=30)
               
               num_success = 0
               for k in range(self.num_episodes):
@@ -209,7 +242,7 @@ class LIBEROEval(BaseEval):
               imageio.mimsave(save_path, images, fps=fps)
               
        
-       def eval_episodes(self, policy: BaseAgent, steps: int, save_path: str):
+       def eval_episodes(self, policy: BaseAgent, steps: int, save_path: str, img_goal=False):
               """
               rollout several episodes and log the mean episode return
               """
@@ -220,7 +253,7 @@ class LIBEROEval(BaseEval):
               policy.eval()
               # for _ in tqdm(range(self.num_episodes), desc="Evaluating..."):
               for task_id in tqdm(range(len(self.task_suite.tasks)), desc="Evaluating..."):
-                     rews.append(self._rollout(policy, task_id))
+                     rews.append(self._rollout(policy, task_id, img_goal))
               eval_rewards = sum(rews) / len(rews)
               metrics = {f'sim/{self.task_suite_name}/all': eval_rewards}
               self._log_results(metrics, self.step)
