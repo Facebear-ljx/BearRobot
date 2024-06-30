@@ -11,7 +11,7 @@ from PIL import Image
 from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
 from BearRobot.Net.my_model.t5 import T5Encoder
-from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang
+from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang, DecisionNCE_visual_diff
 
 def extract(a, x_shape):
        '''
@@ -300,29 +300,49 @@ class VLDDPM_BC(DDPM_BC):
               super().__init__(policy, beta, T, ac_num)
               
               # self.img_size = self.policy.img_size
-              assert text_encoder in ['T5', 'DecisionNCE-T', 'DecisionNCE-P']
+              assert text_encoder in ['T5', 'DecisionNCE-T', 'DecisionNCE-P', "DecisionNCE-V"]
               if text_encoder == 'T5':
                      self.lang_encoder = T5Encoder(device=device)
               elif text_encoder in ['DecisionNCE-T', 'DecisionNCE-P']:
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.lang_encoder = DecisionNCE_lang(mm_encoder)
+              elif text_encoder == "DecisionNCE-V":
+                     text_encoder = 'DecisionNCE-T'
+                     mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
+                     self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder)
               else:
                      raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")
               self.device = device
               
-       def forward(self, images: torch.Tensor, texts: list, action_gt: torch.Tensor, state=None):
+       def forward(self, images: torch.Tensor, cond: dict, action_gt: torch.Tensor, state=None, img_goal=False):
               '''
               calculate ddpm loss
               # images: batch of frames of different views, [B, Frame, View, C, H, W]
               # texts: list of instructions
               # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
               # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
+              # img_begin: one begin frame of a video
+              # img_end: one end frame of a video
+              # img_goal: bool, whether to use img_begin and img_end to calculate visual difference as goal
               '''
-              text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach() if self.lang_encoder is not None else texts
-              loss = self.policy_loss(action_gt, images, text_emb, state)
-              loss_dict = {"policy_loss": loss}
-              return loss_dict
+              img_begin = cond['img_begin']
+              img_end = cond['img_end']
+              texts = cond['lang']
+       
+              if img_goal:
+                     if img_begin != None and img_end != None:      
+                            text_emb_visiual_diff = self.frame_diff_encoder.embed_frame(img_begin, img_end).to(images.device).detach()
+                            loss = self.policy_loss(action_gt, images, text_emb_visiual_diff, state)
+                            loss_dict = {"policy_loss": loss}
+                            return loss_dict
+                     else:
+                            raise ValueError("img_begin or img_end is None")
+              else:
+                     text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
+                     loss = self.policy_loss(action_gt, images, text_emb, state)
+                     loss_dict = {"policy_loss": loss}
+                     return loss_dict
        
        
        def policy_loss(self, x0: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None):
@@ -366,7 +386,7 @@ class VLDDPM_BC(DDPM_BC):
        
        
        @torch.no_grad()
-       def ddpm_sampler(self, shape, imgs: torch.Tensor, lang: list, state: torch.Tensor=None, guidance_strength=0, clip_sample=False):
+       def ddpm_sampler(self, shape, imgs: torch.Tensor, lang: list, state: torch.Tensor=None, guidance_strength=0, clip_sample=False, img_begin=None, img_end=None, img_goal=False):
               """
               sample x0 from xT, reverse process. Note this ddpm_sampler is different from the original ddpm_sampler as the condition type including both img & lang
               
@@ -381,8 +401,13 @@ class VLDDPM_BC(DDPM_BC):
               Return: [num_samples, D_a] samples
               """
               x = torch.randn(shape, device=self.device)
-              cond = self.lang_encoder.embed_text(lang) if self.lang_encoder is not None else lang
-              
+              if img_goal:
+                     if img_begin != None and img_end != None:
+                            cond = self.frame_diff_encoder.embed_frame(img_begin, img_end)
+                     else:
+                            raise ValueError("img_begin or img_end is None")
+              else:
+                     cond = self.lang_encoder.embed_text(lang) if self.lang_encoder is not None else lang        
               # cond = cond.repeat(x.shape[0], 1)
               # imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
               
@@ -394,38 +419,50 @@ class VLDDPM_BC(DDPM_BC):
        
 
        @torch.no_grad()
-       def get_action(self, imgs, lang, state=None, num=1, t=1, k=0.25, clip_sample=True):
-            if not isinstance(imgs, torch.Tensor):
+       def get_action(self, imgs, lang, state=None, num=1, t=1, k=0.25, clip_sample=True, img_begin=None, img_end=None, img_goal=False):
+              if not isinstance(imgs, torch.Tensor):
                 # transform lists to torch.Tensor
                 imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
-            else:
+              else:
                 imgs = imgs.to('cuda')
 
-            B, F, V, C, H, W = imgs.shape
-            try:
+              B, F, V, C, H, W = imgs.shape
+              try:
                    s_dim = self.policy.s_dim
-            except:
+              except:
                    s_dim = self.policy.module.s_dim
-            state = torch.from_numpy(state.astype(np.float32)).view(-1, s_dim) if state is not None else None
-            state = ((state - self.s_mean) / self.s_std).to('cuda') if state is not None else None
+              state = torch.from_numpy(state.astype(np.float32)).view(-1, s_dim) if state is not None else None
+              state = ((state - self.s_mean) / self.s_std).to('cuda') if state is not None else None
             
-            try:
+              try:
                    output_dim = self.policy.output_dim
-            except:
+              except:
                    output_dim = self.policy.module.output_dim
-            action = self.ddpm_sampler((B, output_dim), imgs, [lang] * B, state, clip_sample=clip_sample).detach().cpu()
-            action = action.view(B, -1, 7)
-            
-            B, N, D_a = action.shape
-            a_max = self.a_max.repeat(B, N, 1)
-            a_min = self.a_min.repeat(B, N, 1)
-            a_mean = self.a_mean.repeat(B, N, 1)
-            a_std = self.a_std.repeat(B, N, 1)
-            
-            action = (action + 1) * (a_max - a_min) / 2 + a_min
-            action = self.get_ac_action(action.numpy(), t, k)
-            # action = action * a_std + a_mean
-            return action
+              
+              # use img goal or language goal
+              if img_goal:
+                     if img_begin != None and img_end != None:
+                            img_begin_pools = img_begin.unsqueeze(0).repeat(B, 1, 1, 1)
+                            img_end_pools = img_end.unsqueeze(0).repeat(B, 1, 1, 1) 
+                            action = self.ddpm_sampler((B, output_dim), imgs,lang,state, clip_sample=clip_sample,img_begin=img_begin_pools,img_end=img_end_pools, img_goal=True).detach().cpu()
+                            action = action.view(B, -1, 7)
+                     else:
+                            raise ValueError("img_begin or img_end is None")
+              else:
+                     action = self.ddpm_sampler((B, output_dim), imgs, [lang] * B, state, clip_sample=clip_sample).detach().cpu()
+                     action = action.view(B, -1, 7)
+
+              
+              B, N, D_a = action.shape
+              a_max = self.a_max.repeat(B, N, 1)
+              a_min = self.a_min.repeat(B, N, 1)
+              a_mean = self.a_mean.repeat(B, N, 1)
+              a_std = self.a_std.repeat(B, N, 1)
+              
+              action = (action + 1) * (a_max - a_min) / 2 + a_min
+              action = self.get_ac_action(action.numpy(), t, k)
+              # action = action * a_std + a_mean
+              return action
        
 
 class IDQL_Agent(BaseAgent):

@@ -30,12 +30,11 @@ def get_args():
        parser.add_argument('--visual_encoder', default='resnet34', type=str, help='visual encoder backbone, support resnet 18/34/50')
        parser.add_argument('--visual_pretrain', default=False, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--ft_vision', default=False, type=boolean, help='whether tune the visual encoder')
-       parser.add_argument('--text_encoder', default='DecisionNCE-T', type=str, help='language encoder, support T5, DecisionNCE-T, DecisionNCE-P')
-       
+       parser.add_argument('--text_encoder', default='DecisionNCE-T', type=str, help='language encoder, support T5, DecisionNCE-T, DecisionNCE-P, DecisionNCE-V')       
        parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
        parser.add_argument('--discretize_actions', default=False, type=boolean, help='whether discretize_actions the action or not')
-       parser.add_argument('--s_dim', default=0, type=int, help='qpos dim, 0 means dont use qpos')
+       parser.add_argument('--s_dim', default=9, type=int, help='qpos dim, 0 means dont use qpos')
        parser.add_argument('--encode_s', default=False, type=boolean, help='whether encode the state (qpos) or not')
        parser.add_argument('--encode_a', default=False, type=boolean, help='whether encode the action or not')
        
@@ -68,10 +67,13 @@ def main(args):
        
        # dataset and dataloader
        view_list = ['D435_image', 'wrist_image']
+       
+       img_goal = True  if kwargs['text_encoder'] == 'DecisionNCE-V' else False
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
               datalist=['/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac.json'],
               view_list=view_list,
+              img_goal=img_goal,
               **kwargs
        )
 
@@ -116,6 +118,7 @@ def main(args):
                                 save_freq=args.save_freq, 
                                 save_path=save_path,
                                 resume_path=args.resume,
+                                img_goal=img_goal,
                                 args=args
                      )
        test_trainer.train_steps()

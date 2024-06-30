@@ -15,7 +15,8 @@ from torchvision import transforms
 
 from BearRobot.utils import ddp
 from torch.utils.data import DistributedSampler
-
+from data.libero.data_process import demo2frames
+from data.airkitchen.data_process import get_begin_end_frame
 from mmengine import fileio
 import io
 
@@ -77,6 +78,8 @@ OPENXDATASETS = [
     # 'berkeley_gnm_cory_hall', #1 navigation tasks
     # 'berkeley_gnm_sac_son', #1 navigation tasks
 ]
+
+frame_length_dic = demo2frames.frame_counts_dict()
 
 def openimage(path):
        value  = fileio.get(path)
@@ -444,6 +447,7 @@ class AIRKitchenDataset():
               statistics: dict=None,
               mask_aug: bool=False,  # True for IVM training, False for normal training
               transform_list: list=None,  # e.g. [transforms.RandomResizedCrop(224, scale=(0.75, 1), interpolation=Image.BICUBIC)], you can feed your own transform
+              img_goal: bool=False,
        ):
               self.base_dir = base_dir
               self.img_size = img_size
@@ -453,6 +457,7 @@ class AIRKitchenDataset():
               self.norm = norm
               self.ac_num = ac_num
               self.mask_aug = mask_aug
+              self.img_goal = img_goal
               
               self.datalist = []
               for one_list in datalist:
@@ -563,13 +568,22 @@ class AIRKitchenDataset():
               if self.mask_aug:
                      images[0] = self.aug_mask(step, images[0])           
               images = torch.cat([self.transform(image).unsqueeze(0).unsqueeze(0) for image in images], dim=1)
+
+              return_dict = {"imgs": images,
+                            "label": action,
+                            "lang": lang,
+                            "proprio": state}
               
-              return {"imgs": images,
-                      "label": action,
-                      "lang": lang,
-                      "proprio": state}
+              # return image goal or not
+              if self.img_goal:
+                     img_begin_path, img_end_path = get_begin_end_frame.get_demofixed_begin_end_frame(step,self.base_dir,frame_length_dic)
+                     transform = transforms.ToTensor()
+                     img_begin = transform(openimage(img_begin_path))
+                     img_end = transform(openimage(img_end_path))
+                     return_dict.update({"img_begin": img_begin, "img_end": img_end})
+                           
+              return return_dict
               
-             
 def VideoPredictDataLoader(
        base_dir: str='/data/openxdata_npy',
        datalist: str='/data/openxdata_npy/datalist.json',
@@ -624,6 +638,7 @@ def AIRKitchenDataLoader(
        pin_mem: bool=True,
        ac_num: int=4,
        transform_list: list=None,
+       img_goal: bool=False,
        **kwargs,
 ):
        dataset = AIRKitchenDataset(base_dir=base_dir,
@@ -634,7 +649,8 @@ def AIRKitchenDataLoader(
                                    discretize_actions=discretize_actions, 
                                    norm=norm,
                                    ac_num=ac_num,
-                                   transform_list=transform_list)
+                                   transform_list=transform_list,
+                                   img_goal=img_goal)
        
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()

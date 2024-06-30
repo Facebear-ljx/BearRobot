@@ -44,12 +44,16 @@ class BCTrainer:
               save_freq: int=10000,
               save_path: str=None,
               resume_path: str=None,
+              img_goal: bool=False,
               args=None,
               **kwargs,
        ):     
               self.args = args
               if args.ddp:
                      torch.distributed.barrier()
+              
+              # use image goal or not
+              self.img_goal = img_goal
               
               # optimizer
               self.optimizer = OPTIMIZER[optimizer](agent.policy.parameters(), lr=lr)
@@ -108,9 +112,20 @@ class BCTrainer:
                                    imgs = batch['imgs'].to(self.device)
                                    a = batch['a'].to(self.device)
                                    lang = batch['lang']
+                                   try:
+                                          img_begin = batch["img_begin"]
+                                          img_end =  batch["img_end"]
+                                   except:
+                                          img_begin = None
+                                          img_end = None
+                                   
+                                   cond = {"lang": lang,
+                                           "img_begin": img_begin,
+                                           "img_end": img_end
+                                          }
                                    
                                    self.optimizer.zero_grad()
-                                   loss = self.agent(imgs, lang, a)
+                                   loss = self.agent(imgs, cond, a, img_goal=True)  # TODO args
                                    loss.backward()
                                    self.optimizer.step()
                                    if self.args.ddp:
@@ -161,10 +176,21 @@ class BCTrainer:
                             label = batch['label'].to(self.device)
                             proprio = batch['proprio'].to(self.device)
                             lang = batch['lang']
+                            try:
+                                   img_begin = batch["img_begin"]
+                                   img_end =  batch["img_end"]
+                            except:
+                                   img_begin = None
+                                   img_end = None
                             
+                            cond = {"lang": lang,
+                                   "img_begin": img_begin,
+                                   "img_end": img_end
+                                   }
+
                             # one gradient step
                             self.optimizer.zero_grad()
-                            loss = self.agent(imgs, lang, label, proprio)
+                            loss = self.agent(imgs, cond, label, proprio, img_goal=True)  # TODO, args
                             loss['policy_loss'].backward()
                             self.optimizer.step()
                             t2 = time.time()
@@ -202,7 +228,7 @@ class BCTrainer:
                                           evaluate = True
                                    
                                    if evaluate:
-                                          self.evaluator.eval_episodes(self.agent, step, self.save_path) 
+                                          self.evaluator.eval_episodes(self.agent, step, self.save_path, self.img_goal) 
                             
                             if self.args.ddp:
                                    torch.distributed.barrier()
