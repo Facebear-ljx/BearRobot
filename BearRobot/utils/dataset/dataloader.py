@@ -16,7 +16,7 @@ from torchvision import transforms
 from BearRobot.utils import ddp
 from torch.utils.data import DistributedSampler
 from data.libero.data_process import demo2frames
-from data.airkitchen.data_process import get_begin_end_frame
+from data.libero.data_process import get_libero_frame
 from mmengine import fileio
 import io
 
@@ -576,7 +576,7 @@ class AIRKitchenDataset():
               
               # return image goal or not
               if self.img_goal:
-                     img_begin_path, img_end_path = get_begin_end_frame.get_demofixed_begin_end_frame(step,self.base_dir,frame_length_dic)
+                     img_begin_path, img_end_path = get_libero_frame.get_demofixed_idx_begin_frame(step,self.base_dir,frame_length_dic)
                      transform = transforms.ToTensor()
                      img_begin = transform(openimage(img_begin_path))
                      img_end = transform(openimage(img_end_path))

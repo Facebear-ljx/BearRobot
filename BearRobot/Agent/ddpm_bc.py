@@ -442,7 +442,12 @@ class VLDDPM_BC(DDPM_BC):
               # use img goal or language goal
               if img_goal:
                      if img_begin != None and img_end != None:
-                            img_begin_pools = img_begin.unsqueeze(0).repeat(B, 1, 1, 1)
+                            if len(img_begin.shape) == 3:
+                                   img_begin_pools = img_begin.unsqueeze(0).repeat(B, 1, 1, 1)
+                            elif len(img_begin.shape) == 4 and img_begin.shape[0] == B:
+                                   img_begin_pools = img_begin
+                            else:
+                                   raise ValueError(f"Please check the shape of img_begin: {img_begin.shape}")
                             img_end_pools = img_end.unsqueeze(0).repeat(B, 1, 1, 1) 
                             action = self.ddpm_sampler((B, output_dim), imgs,lang,state, clip_sample=clip_sample,img_begin=img_begin_pools,img_end=img_end_pools, img_goal=True).detach().cpu()
                             action = action.view(B, -1, 7)
