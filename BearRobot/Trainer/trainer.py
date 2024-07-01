@@ -125,7 +125,7 @@ class BCTrainer:
                                           }
                                    
                                    self.optimizer.zero_grad()
-                                   loss = self.agent(imgs, cond, a, img_goal=True)  # TODO args
+                                   loss = self.agent(imgs, cond, a, img_goal=self.img_goal)
                                    loss.backward()
                                    self.optimizer.step()
                                    if self.args.ddp:
@@ -190,7 +190,7 @@ class BCTrainer:
 
                             # one gradient step
                             self.optimizer.zero_grad()
-                            loss = self.agent(imgs, cond, label, proprio, img_goal=True)  # TODO, args
+                            loss = self.agent(imgs, cond, label, proprio, img_goal=self.img_goal)
                             loss['policy_loss'].backward()
                             self.optimizer.step()
                             t2 = time.time()

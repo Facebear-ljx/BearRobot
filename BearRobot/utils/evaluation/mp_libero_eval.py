@@ -106,9 +106,10 @@ class LIBEROEval(BaseEval):
               # eval with the beginning frame and the endding frame
               env_dict = {}
               transform = transforms.ToTensor()
-              env_dict['img_begin'] = transform(openimage(os.path.join("libero/data_jpg/libero_goal/", demo_path, "image0/0.jpg")))
+              base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/'
+              env_dict['img_begin'] = transform(openimage(os.path.join(base_dir, "libero/data_jpg/libero_goal/", demo_path, "image0/0.jpg")))
               end_idx = frame_length_dict[demo_path] - 1 
-              env_dict['img_end'] = transform(openimage(os.path.join("libero/data_jpg/libero_goal/", demo_path, f"image0/{end_idx}.jpg")))
+              env_dict['img_end'] = transform(openimage(os.path.join(base_dir, "libero/data_jpg/libero_goal/", demo_path, f"image0/{end_idx}.jpg")))
 
               # eval with the random frames
               # env_dict = {}
@@ -214,7 +215,7 @@ class LIBEROEval(BaseEval):
 
                      # get action using img_begin and img_end embedding difference
                      if img_goal:
-                            action = policy.get_action(image_input, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end)
+                            action = policy.get_action(image_input, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal)
                      else:
                             action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)
                      # reshape
