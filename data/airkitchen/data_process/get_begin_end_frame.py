@@ -43,7 +43,11 @@ def get_demofixed_random_frame(step,base_dir,frame_length_dic,img_base_dir = "li
         idx0 = step_idx
     else:
         idx0 = torch.randint(0, step_idx, (1,)).item()
-    idx1 = torch.randint(step_idx, frame_length, (1,)).item()
+    
+    if step_idx == frame_length:
+        idx1 = step_idx
+    else:
+        idx1 = torch.randint(step_idx, frame_length, (1,)).item()
 
     img_begin_path = os.path.join(base_dir,img_base_dir,key,f"image0/{idx0}.jpg")
     img_end_path = os.path.join(base_dir,img_base_dir,key,f"image0/{idx1}.jpg")
