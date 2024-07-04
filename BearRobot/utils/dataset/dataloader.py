@@ -569,10 +569,12 @@ class AIRKitchenDataset():
                      images[0] = self.aug_mask(step, images[0])           
               images = torch.cat([self.transform(image).unsqueeze(0).unsqueeze(0) for image in images], dim=1)
 
+              #TODO 改一下dataloader
               return_dict = {"imgs": images,
                             "label": action,
                             "lang": lang,
-                            "proprio": state}
+                            "proprio": state,
+                            }
               
               # return image goal or not
               if self.img_goal:
