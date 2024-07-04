@@ -418,6 +418,7 @@ class IDQL_Agent(BaseAgent):
               num_sample: int=64,
               gamma: float=0.99,
               expectile: float=0.5,
+              K: int=60
        ):       
               super().__init__(
                      policy_model,
@@ -431,7 +432,11 @@ class IDQL_Agent(BaseAgent):
               
               self.expectile = expectile
               self.num_sample = num_sample
-              self.device = self.policy.device     
+              self.device = self.policy.device  
+              
+              self.estimate_T = -1
+              self.count_T = 0 
+              self.K = K
 
        def get_target_distribution(self,b):
               target_distribution = torch.zeros(50)
@@ -445,25 +450,42 @@ class IDQL_Agent(BaseAgent):
                      target_distribution[b - 1] = 1/3
                      target_distribution[b] = 1/3
                      target_distribution[b + 1] = 1/3
-              return target_distribution
+              return target_distribution # [0% 2% 4% ... 98%] shape (50,)
        
               
-       def v_loss(self, batch):
-              s = batch["s"] #B,S
-              image_1 = batch["D435_image"] #B,C,H,W
-              image_2 = batch["wrist_image"]
-              batch_size = s.shape[0]
+       def v_loss(self, imgs: torch.Tensor, state: torch.Tensor, t: int=0, T: int=100):
+              # Input:
+              # imgs: [B, F, V, C, H, W] batch of frames of different views
+              # state: [B, D_s] batch of robot arm x,y,z, gripper state
+              # t: [B, 1] timestep
+              # T: [B, 1] total timesteps
+              #
+              # Output:
+              # cross_entropy loss
               
-              T_list = [frame_length_dic["/".join(sample["D435_image"].split("/")[3:5])] for sample in batch] 
-              t_list = [int((sample["D435_image"].split("/")[-1]).replace(".jpg","")) for sample in batch]
-              
-              b_list = [int(round((t / T) / 0.02)) for t, T in zip(t_list, T_list)]
+              # resize images
+              imgs = imgs.squeeze(1) # [B, V, C, H, W]
+              imgs_tuple = torch.chunk(imgs, 2, dim=1)
+              image_1 = imgs_tuple[0].squeeze(1) # [B, C, H, W] 
+              image_2 = imgs_tuple[1].squeeze(1) # [B, C, H, W]
 
-              target_distributions = torch.stack([self.get_target_distribution(b) for b in b_list])
+              # change a style
+              # T_list = [frame_length_dic["/".join(sample["D435_image"].split("/")[3:5])] for sample in batch] 
+              # t_list = [int((sample["D435_image"].split("/")[-1]).replace(".jpg","")) for sample in batch]
+              # b_list = [int(round((t / T) / 0.02)) for t, T in zip(t_list, T_list)]
               
-              v = self.v_model(image_1,image_2,s)
-              loss = F.cross_entropy(v, target_distributions.argmax(dim=1))
-              return loss, v.mean()
+              # calculate b
+              b = torch.round(t/T/0.02) 
+              target_distributions = torch.stack([self.get_target_distribution(int(i)) for i in b])
+              
+              # calculate v
+              v = self.v_model(image_1, image_2, state) # [B, 50]
+              
+              # 1/3 is neglected
+              # loss = F.cross_entropy(v, target_distributions.argmax(dim=1)) 
+              loss = F.cross_entropy(v, target_distributions)
+              
+              return loss, v.mean(dim=-1)
 
        
        def q_loss(self, s, a, r, next_s, d):
@@ -489,15 +511,34 @@ class IDQL_Agent(BaseAgent):
        
        
        @torch.no_grad()
-       def get_action(self, state):
+       def get_action(self, imgs, lang, state=None, current_time=0, num=1, t=1, k=0.25, clip_sample=True, img_begin=None, img_end=None, img_goal=False):
               
-              actions = self.policy.get_action(state, self.num_sample, clip_sample=True)
-       
-              state = state.repeat(actions.shape[0], 1)
-              qs = torch.cat(self.q_models_target(state, actions), axis=1).min(axis=1)[0]
-              idx = torch.argmax(qs)
+              # c\resize images
+              imgs = imgs.squeeze(1) # [B, V, C, H, W]
+              imgs_tuple = torch.chunk(imgs, 2, dim=1)
+              image_1 = imgs_tuple[0].squeeze(1) # [B, C, H, W] 
+              image_2 = imgs_tuple[1].squeeze(1) # [B, C, H, W]
+    
+              # estimate traj T
+              self.count_T += 1
+              T = current_time / self.v_model(image_1, image_2, state).argmax(dim=1).item()
+              if self.estimate_T < 0:
+                     self.estimate_T = T
+              else:
+                     self.estimate_T = self.estimate_T + (T - self.estimate_T) / self.count_T
               
-              action = actions[idx]
+              # ddpm agent
+              if img_goal:
+                     action = self.policy.get_action(imgs, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal)
+              else:
+                     action = self.policy.get_action(imgs, lang, state=state, t=t, k=0.25)
+
+              # not in use
+              # state = state.repeat(actions.shape[0], 1)
+              # qs = torch.cat(self.q_models_target(state, actions), axis=1).min(axis=1)[0]
+              # idx = torch.argmax(qs)
+              # action = actions[idx]
+              
               return action
               
               

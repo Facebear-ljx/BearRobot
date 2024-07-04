@@ -9,7 +9,7 @@ import numpy as np
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
 from Err_ddpm_bc import VLDDPM_BC,IDQL_Agent
 
-from BearRobot.utils.dataset.dataloader import AIRKitchenDataLoader
+from BearRobot.utils.dataset.dataloader import AIRKitchenDataLoader_err
 from BearRobot.utils.logger.tb_log import TensorBoardLogger as Logger
 from BearRobot.utils.net.initialization import boolean
 from BearRobot.utils import ddp
@@ -41,7 +41,7 @@ def main(args):
     view_list = ['D435_image', 'wrist_image']
 
     img_goal = True if kwargs['text_encoder'] == 'DecisionNCE-V' else False
-    rt1dataloader, statistics = AIRKitchenDataLoader(
+    rt1dataloader, statistics = AIRKitchenDataLoader_err(
         base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
         datalist=['/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac.json'],
         view_list=view_list,
@@ -71,7 +71,7 @@ def main(args):
         output_dim=int(7 * args.ac_num),
         **kwargs
     ).to(rank)
-    agent = IDQL_Agent(policy=visual_diffusion_policy, **kwargs)
+    agent = IDQL_Agent(policy=visual_diffusion_policy, K=60 , **kwargs)
     agent.get_statistics(os.path.join(args.save_path, 'statistics.json'))
     agent.get_transform(img_size=0)
 
@@ -87,7 +87,7 @@ def main(args):
         policy_ema=1e-3,
         critic_ema=5e-3,
         optimizer='adam',
-        device="cuda"
+        device="cuda",
     )
     test_trainer.train_steps()
 

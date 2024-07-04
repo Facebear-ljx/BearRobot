@@ -86,14 +86,13 @@ class RLTrainer:
                      for key in batch.keys(): 
                             batch[key] = batch[key].to(self.device)
                      
-                     #TODO change this to RL dataloader
-                     ##origin
-                     s, a, r, next_s, d = batch['s'], batch['a'], batch['r'], batch['next_s'], batch['d']
-                     ##change
+                     # load from airkitchendataloader_err
                      imgs = batch['imgs'].to(self.device)
                      label = batch['label'].to(self.device)
                      proprio = batch['proprio'].to(self.device)
                      lang = batch['lang']
+                     t = batch['t']
+                     T = batch['T']
      
                      try:
                             img_begin = batch["img_begin"]
@@ -107,44 +106,33 @@ class RLTrainer:
                             "img_end": img_end
                             }
                      
-                     
-                     # if self.ema is not None:
-                     #        self.ema_update()
-
-                     # self.scheduler.step()
-                     
-                     # update policy
+                     # update ddpm policy
                      self.policy_optimizer.zero_grad()
-                     
-                     ##origin
-                     p_loss = self.agent.policy_loss(a, s)
-                     p_loss.backward()
-                     ##change
                      p_loss = self.agent.policy(imgs, cond, label, proprio, img_goal=False)
                      p_loss['policy_loss'].backward()
-                     
                      self.policy_optimizer.step()
-                     self.scheduler.step()
-                     self.ema_update_policy()
+                     
+                     # not in use
+                     # self.ema_update_policy()
                      
                      # update v
                      self.v_optimizer.zero_grad()
-                     v_loss, v_mean = self.agent.v_loss(s,next_s)
+                     v_loss, v_mean = self.agent.v_loss(imgs, proprio, t, T)
                      v_loss.backward()
                      self.v_optimizer.step()
+                     self.scheduler.step()
                      
-                     # update q
-                     self.q_optimizer.zero_grad()
-                     q_loss = self.agent.q_loss(s, a, r, next_s, d)
-                     q_loss.backward()
-                     self.q_optimizer.step()
-                     self.ema_update_q()
+                     # update q (not in use)
+                     # self.q_optimizer.zero_grad()
+                     # q_loss = self.agent.q_loss(s, a, r, next_s, d)
+                     # q_loss.backward()
+                     # self.q_optimizer.step()
+                     # self.ema_update_q()
                      
                      # log the training process
                      if (step + 1) % self.logger.record_freq == 0:
                             self.logger.log_metrics({"train/policy_loss": p_loss.item(),
                                                  "train/v_loss": v_loss.item(),
-                                                 "train/q_loss": q_loss.item(),
                                                  "train/v_mean": v_mean.item(),
                                                  "train/lr": self.scheduler.get_last_lr()[0]}, step=step)
                      

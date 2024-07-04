@@ -220,9 +220,9 @@ class LIBEROEval(BaseEval):
                             # using the current frame as the img_begin   # TODO delete this if not useful
                             img_begin = torch.from_numpy(obs['agentview_image']).permute(0, 3, 1, 2) / 255
                             
-                            action = policy.get_action(image_input, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal)
+                            action = policy.get_action(image_input, None, state=state, current_time=1, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal)
                      else:
-                            action = policy.get_action(image_input, lang, state=state, t=t, k=0.25)
+                            action = policy.get_action(image_input, lang, state=state, current_time=1, t=t, k=0.25)
                      # reshape
                      action = action.reshape(self.num_episodes, -1)
                      
