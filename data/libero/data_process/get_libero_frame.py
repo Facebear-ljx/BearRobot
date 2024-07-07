@@ -8,36 +8,31 @@ from data.libero.data_process import demo2frames
 import random
 
 
-def get_demofixed_begin_end_frame(step, base_dir, frame_length_dic, img_base_dir = "libero/data_jpg/libero_goal/"):
+def get_demofixed_begin_end_frame(step, frame_length_dic):
     """return a fixed begin and fixed end frame
 
     Args:
         step (dict): one dict contains one step info of the libero demo, such as D435_image, wrist_image....
-        base_dir (str): libero data base dir
         frame_length_dic (dict): _description_
-        img_base_dir (str, optional): _description_. Defaults to "libero/data_jpg/libero_goal/".
 
     Returns:
         _type_: _description_
     """
     
-    pattern = re.compile(r'([^/]+_demo)/demo_(\d+)/')
-
+    pattern = re.compile(r'.+/(libero_.+)/(.+_demo)/demo_(\d+)/')
     match = pattern.search(step['D435_image'])
     
     if match:
-            instruction = match.group(1)
-            demo_id = match.group(2)
-            key = f"{instruction}/demo_{demo_id}"
+            task_suite = match.group(1)
+            instruction = match.group(2)
+            demo_id = match.group(3)
+            key = f"{task_suite}/{instruction}/demo_{demo_id}"
             frame_length = frame_length_dic.get(key, 100) - 1 # Default to 1000 if not found
 
-    pattern_step_idx = re.compile(r'/(\d+)\.jpg$')
-    match = pattern_step_idx.search(step['D435_image'])
+    img_begin_path = step['D435_image'].replace(step['D435_image'].split("/")[-1], "0.jpg")
+    img_end_path = step['D435_image'].replace(step['D435_image'].split("/")[-1], f"{frame_length}.jpg")
 
-    img_begin_path = os.path.join(base_dir, img_base_dir, key, f"image0/{0}.jpg")
-    img_end_path = os.path.join(base_dir, img_base_dir, key, f"image0/{frame_length}.jpg")
-
-    return img_begin_path,img_end_path
+    return img_begin_path, img_end_path
 
 def get_demofixed_random_frame(step,base_dir,frame_length_dic,img_base_dir = "libero/data_jpg/libero_goal/"):
     '''
@@ -137,7 +132,7 @@ def get_demo_length(step,base_dir,frame_length_dic,img_base_dir = "libero/data_j
 def test_func():
     global base_dir,datalist
     base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/'
-    datalist=['/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac.json']
+    datalist=['/home/dodo/ljx/BearRobot/data/libero/libero_spatial-ac.json']
     datalist_img = []  
 
     def openjson(path):
@@ -155,4 +150,5 @@ def test_func():
     return step
 
 if __name__ == "__main__":
-    get_demofixed_begin_end_frame(test_func(),base_dir,demo2frames.frame_counts_dict())
+    json_path = '/home/dodo/ljx/BearRobot/data/libero/libero_spatial-ac.json'
+    get_demofixed_begin_end_frame(test_func(), demo2frames.frame_counts_dict(json_path))

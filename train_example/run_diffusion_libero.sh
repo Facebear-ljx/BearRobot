@@ -5,7 +5,7 @@ for seed in 42; do
 export CUDA_VISIBLE_DEVICES=1
 export WANDB_API_KEY=cfbf81ce9bd7daca9d32f4bd1dbf26e8c93310c3
 torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_example_libero.py \
-    --dataset 'libero_goal' \
+    --dataset_name 'libero_goal' \
     --algo_name 'diffusion visual motor' \
     --ddp False \
     --img_size 128 \

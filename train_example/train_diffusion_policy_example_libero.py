@@ -21,6 +21,13 @@ import torch.multiprocessing as mp
 import argparse
 import json
 
+LIBERO_DATASETS = {'libero_goal': ["libero_goal"],
+                   "libero_object": ["libero_object"],
+                   "libero_spatial": ["libero_spatial"],
+                   "libero_10": ["libero_10"],
+                   "libero_90": ["libero_90"],
+                   "libero30": ["libero_goal", "libero_object", "libero_spatial"],
+                   "libero130": ["libero_goal", "libero_object", "libero_spatial", "libero_10", "libero_90"]}
 
 def get_args():
        parser = basic_args()
@@ -53,6 +60,7 @@ def get_args():
 
 def main(args):
        kwargs = vars(args)
+       assert kwargs['dataset_name'] in LIBERO_DATASETS
        # seed
        seed = args.seed + ddp.get_rank()
        np.random.seed(seed)
@@ -69,9 +77,11 @@ def main(args):
        view_list = ['D435_image', 'wrist_image']
        
        img_goal = True  if kwargs['text_encoder'] == 'DecisionNCE-V' else False
+       dataset_name = kwargs['dataset_name']
+       json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac.json'
        rt1dataloader, statistics = AIRKitchenDataLoader(
-              base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
-              datalist=['/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac.json'],
+              base_dir='/data/',
+              datalist=[json_path],
               view_list=view_list,
               img_goal=img_goal,
               **kwargs
@@ -102,7 +112,7 @@ def main(args):
        agent.get_transform(img_size=0)
        
        # evaluator
-       evaluator = LIBEROEval(task_suite_name='libero_goal', data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger, rank=global_rank)
+       evaluator = LIBEROEval(task_suite_name=kwargs['dataset_name'], data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger, rank=global_rank, json_path=json_path)
        
        # trainer
        test_trainer = BCTrainer(agent, 

@@ -23,8 +23,16 @@ from functools import partial
 import imageio
 
 EPS = 1e-5
+LIBERO_DATASETS = {'libero_goal': ["libero_goal"],
+                   "libero_object": ["libero_object"],
+                   "libero_spatial": ["libero_spatial"],
+                   "libero_10": ["libero_10"],
+                   "libero_90": ["libero_90"],
+                   "libero30": ["libero_goal", "libero_object", "libero_spatial"],
+                   "libero130": ["libero_goal", "libero_object", "libero_spatial", "libero_10", "libero_90"]}
+
+
 benchmark_dict = benchmark.get_benchmark_dict()
-frame_length_dict = demo2frames.frame_counts_dict(json_name = 'libero_goal-ac.json')  # TODO args
 
 def has_normalize(transform):
        if isinstance(transform, transforms.Compose):
@@ -37,7 +45,7 @@ def has_normalize(transform):
 class LIBEROEval(BaseEval):
        def __init__(
               self,
-              task_suite_name: str, # can choose libero_spatial, libero_spatial, libero_object, libero_100, all, etc.
+              task_suite_name: str, # can choose libero_spatial, libero_goal, libero_object, libero_10, libero30, libero_90, libero130.
               obs_key: list=['agentview_image', 'robot0_eye_in_hand_image', 'robot0_gripper_qpos', 'robot0_eef_pos', 'robot0_eef_quat'],
               data_statistics: dict=None,
               logger: BaseLogger=None,
@@ -46,12 +54,18 @@ class LIBEROEval(BaseEval):
               eval_freq: int=10,
               seed: int=42,
               rank: int=0,
+              json_path: str='libero_goal-ac.json',
        ):
               super(BaseEval, self).__init__()   
               self.task_suite_name = task_suite_name
-              self.task_suite = benchmark_dict[task_suite_name]()
+              
+              assert self.task_suite_name in LIBERO_DATASETS
+              self.task_list = LIBERO_DATASETS[self.task_suite_name]
+              self.task_suite_list = [benchmark_dict[task]() for task in self.task_list]
               self.obs_key = obs_key
               self.data_statistics = data_statistics
+              
+              self.frame_length_dict = demo2frames.frame_counts_dict(json_path=json_path)
               
               self.eval_horizon = eval_horizon
               self.num_episodes = num_episodes
@@ -69,9 +83,9 @@ class LIBEROEval(BaseEval):
                             os.makedirs(path)
                      self.base_dir = path
        
-       def _init_env(self, task_id: int=0):
+       def _init_env(self, task_suite, task_id: int=0):
               # get task information and env args
-              task = self.task_suite.get_task(task_id)
+              task = task_suite.get_task(task_id)
               task_name = task.name
               task_description = task.language
               task_bddl_file = os.path.join(get_libero_path("bddl_files"), task.problem_folder, task.bddl_file)
@@ -94,23 +108,23 @@ class LIBEROEval(BaseEval):
               # environment reset 
               env.seed(self.seed + 100)
               env.reset()
-              init_states = self.task_suite.get_task_init_states(task_id) # for benchmarking purpose, we fix the a set of initial states
+              init_states = task_suite.get_task_init_states(task_id) # for benchmarking purpose, we fix the a set of initial states
               init_state_id = np.arange(self.num_episodes) % init_states.shape[0]
               obs = env.set_init_state(init_states[init_state_id])
               
               ### sample one begin and end image frame to construct image goal
               # Generating paths for img_begin and img_end
               task_name = task_description.replace(" ", "_") + "_demo"
-              demo_paths = demo2frames.get_demos_for_task(task_name, frame_length_dict)
+              demo_paths = demo2frames.get_demos_for_task(task_name, self.frame_length_dict)
               demo_path = random.choice(demo_paths)
 
               # eval with the beginning frame and the endding frame
               env_dict = {}
               transform = transforms.ToTensor()
-              base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/'
-              env_dict['img_begin'] = transform(openimage(os.path.join(base_dir, "libero/data_jpg/libero_goal/", demo_path, "image0/0.jpg")))
-              end_idx = frame_length_dict[demo_path] - 1 
-              env_dict['img_end'] = transform(openimage(os.path.join(base_dir, "libero/data_jpg/libero_goal/", demo_path, f"image0/{end_idx}.jpg")))
+              base_dir='/data/libero/data_jpg/'
+              env_dict['img_begin'] = transform(openimage(os.path.join(base_dir, demo_path, "image0/0.jpg")))
+              end_idx = self.frame_length_dict[demo_path] - 1 
+              env_dict['img_end'] = transform(openimage(os.path.join(base_dir, demo_path, f"image0/{end_idx}.jpg")))
 
               # eval with the random frames
               # env_dict = {}
@@ -176,11 +190,11 @@ class LIBEROEval(BaseEval):
                      image = (image - norm_mean) / norm_std
               return image  # B, C, H, W
 
-       def _rollout(self, policy: BaseAgent, task_id: int=0, img_goal=False):
+       def _rollout(self, task_suite, policy: BaseAgent, task_id: int=0, img_goal=False):
               """
               rollout one episode and return the episode return
               """
-              env = self._init_env(task_id)
+              env = self._init_env(task_suite, task_id)
               lang = env['language_instruction']
               obs = env['obs']
               img_begin = env['img_begin']
@@ -256,11 +270,11 @@ class LIBEROEval(BaseEval):
               
               rews = []
               policy.eval()
-              # for _ in tqdm(range(self.num_episodes), desc="Evaluating..."):
-              for task_id in tqdm(range(len(self.task_suite.tasks)), desc="Evaluating..."):
-                     rews.append(self._rollout(policy, task_id, img_goal))
+              for task_suite in self.task_suite_list:
+                     for task_id in tqdm(range(len(task_suite.tasks)), desc="Evaluating..."):
+                            rews.append(self._rollout(task_suite, policy, task_id, img_goal))
               eval_rewards = sum(rews) / len(rews)
-              metrics = {f'sim/{self.task_suite_name}/all': eval_rewards}
+              metrics = {f'sim_summary/{self.task_suite_name}/all': eval_rewards}
               self._log_results(metrics, self.step)
               return eval_rewards
               

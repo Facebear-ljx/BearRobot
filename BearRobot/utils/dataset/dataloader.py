@@ -79,7 +79,6 @@ OPENXDATASETS = [
     # 'berkeley_gnm_sac_son', #1 navigation tasks
 ]
 
-frame_length_dic = demo2frames.frame_counts_dict()
 
 def openimage(path):
        value  = fileio.get(path)
@@ -461,8 +460,8 @@ class AIRKitchenDataset():
               
               self.datalist = []
               for one_list in datalist:
-                     datalist = openjson(one_list)
-                     self.datalist += datalist
+                     data = openjson(one_list)
+                     self.datalist += data
                      
               self._statistics(statistics)
               
@@ -477,6 +476,9 @@ class AIRKitchenDataset():
               else:
                      transform_list = transform_list  
               self.transform = transforms.Compose(transform_list)
+              
+              if img_goal:
+                     self.frame_length_dic = demo2frames.frame_counts_dict(json_path=datalist[0])
 
        def _statistics(self, statistics=None):
               if statistics is None:
@@ -576,11 +578,17 @@ class AIRKitchenDataset():
               
               # return image goal or not
               if self.img_goal:
-                     img_begin_path, img_end_path = get_libero_frame.get_demofixed_idx_begin_frame(step,self.base_dir,frame_length_dic)
+                     img_begin_path, img_end_path = get_libero_frame.get_demofixed_begin_end_frame(step, self.frame_length_dic)
+                     img_begin_path = os.path.join(self.base_dir, img_begin_path)
+                     img_end_path = os.path.join(self.base_dir, img_end_path)
                      transform = transforms.ToTensor()
                      img_begin = transform(openimage(img_begin_path))
                      img_end = transform(openimage(img_end_path))
-                     return_dict.update({"img_begin": img_begin, "img_end": img_end})
+                     return_dict.update({"img_begin": img_begin, 
+                                         "img_end": img_end, 
+                                         "img_begin_path": img_begin_path, 
+                                         "img_end_path": img_end_path, 
+                                         "img_path": step['D435_image']})
                            
               return return_dict
               
