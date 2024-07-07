@@ -18,15 +18,15 @@ setup(
     long_description=read('readme.md'),
     author='Jianxiong Li',
     install_requires=[
-        # 'torch==1.13.1',
-        # 'torchvision==0.14.1',
-        # 'timm==0.9.12',
-        # 'mmengine',
+        'torch==2.2.1',
+        'torchvision==0.17.1',
+        'timm==0.9.12',
+        'mmengine',
         'tqdm',
-        # 'numpy',
-        # 'tensorboardX',
-        # 'gdown',
-        # 'openai-clip',
-        # 'chardet'
+        'numpy',
+        'tensorboardX',
+        'gdown',
+        'openai-clip',
+        'chardet'
     ]
 )

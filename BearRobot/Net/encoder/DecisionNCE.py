@@ -61,6 +61,7 @@ class DecisionNCE_visual_diff():
     def __init__(self, mm_encoder: DecisionNCE_encoder):
         super().__init__()
         self.mm_encoder = mm_encoder
+        self.mm_encoder.eval()
 
     def embed_frame(self, img_begin, img_end):
        image_feature = self.mm_encoder.encode_image(img_begin)

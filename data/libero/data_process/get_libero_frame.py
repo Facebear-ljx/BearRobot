@@ -5,6 +5,9 @@ from mmengine import fileio
 import json
 from data.libero.data_process import demo2frames
 
+import random
+
+
 def get_demofixed_begin_end_frame(step, base_dir, frame_length_dic, img_base_dir = "libero/data_jpg/libero_goal/"):
     """return a fixed begin and fixed end frame
 
@@ -97,6 +100,39 @@ def get_demofixed_idx_begin_frame(step,base_dir,frame_length_dic,img_base_dir = 
     img_end_path = os.path.join(base_dir,img_base_dir,key,f"image0/{idx1}.jpg")
 
     return img_begin_path, img_end_path
+
+def get_demorandom_begin_end_frame(step, base_dir, frame_length_dic, img_base_dir = "libero/data_jpg/libero_goal/"):
+
+    instruction = step['instruction']
+    task_name = instruction.replace(" ", "_") + "_demo"
+    demo_paths = demo2frames.get_demos_for_task(task_name, frame_length_dic)
+    demo_path = random.choice(demo_paths)
+    end_idx = frame_length_dic[demo_path] - 1
+    
+    img_begin_path = os.path.join(base_dir, img_base_dir, demo_path, "image0/0.jpg")
+    img_end_path = os.path.join(base_dir, img_base_dir, demo_path, f"image0/{end_idx}.jpg")
+    
+    return img_begin_path, img_end_path
+    
+
+def get_demo_length(step,base_dir,frame_length_dic,img_base_dir = "libero/data_jpg/libero_goal/"):
+    '''
+    return demo length
+    '''
+    pattern = re.compile(r'([^/]+_demo)/demo_(\d+)/')
+
+    match = pattern.search(step['D435_image'])
+    
+    frame_length = 100
+    
+    if match:
+            instruction = match.group(1)
+            demo_id = match.group(2)
+            key = f"{instruction}/demo_{demo_id}"
+            frame_length = frame_length_dic.get(key, 100) - 1 # Default to 1000 if not found
+
+    return frame_length
+
 
 def test_func():
     global base_dir,datalist

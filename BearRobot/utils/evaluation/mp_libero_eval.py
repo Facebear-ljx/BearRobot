@@ -217,7 +217,7 @@ class LIBEROEval(BaseEval):
                      # get action using img_begin and img_end embedding difference
                      if img_goal:
                             # using the current frame as the img_begin   # TODO delete this if not useful
-                            img_begin = torch.from_numpy(obs['agentview_image']).permute(0, 3, 1, 2) / 255
+                            # img_begin = torch.from_numpy(obs['agentview_image']).permute(0, 3, 1, 2) / 255
                             
                             action = policy.get_action(image_input, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal)
                      else:
