@@ -80,7 +80,7 @@ def main(args):
        dataset_name = kwargs['dataset_name']
        json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac.json'
        rt1dataloader, statistics = AIRKitchenDataLoader(
-              base_dir='/data/',
+              base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
               datalist=[json_path],
               view_list=view_list,
               img_goal=img_goal,
