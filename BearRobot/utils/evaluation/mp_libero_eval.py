@@ -54,7 +54,7 @@ class LIBEROEval(BaseEval):
               eval_freq: int=10,
               seed: int=42,
               rank: int=0,
-              json_path: str='libero_goal-ac.json',
+              json_path: str='/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac.json',
        ):
               super(BaseEval, self).__init__()   
               self.task_suite_name = task_suite_name

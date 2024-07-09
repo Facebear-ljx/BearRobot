@@ -307,13 +307,18 @@ class VLDDPM_BC(DDPM_BC):
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.lang_encoder = DecisionNCE_lang(mm_encoder)
               elif text_encoder == "DecisionNCE-V":
-                     text_encoder = 'DecisionNCE-T'
+                     text_encoder = 'DecisionNCE-T_all_600ep'
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder)
+                     self.lang_encoder = DecisionNCE_visual_diff(mm_encoder)
               else:
                      raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")
               self.device = device
+              try:
+                     self.add_noise = kwargs['add_noise']
+              except:
+                     self.add_noise = False
               
        def forward(self, images: torch.Tensor, cond: dict, action_gt: torch.Tensor, state=None, img_goal=False):
               '''
@@ -381,6 +386,8 @@ class VLDDPM_BC(DDPM_BC):
               
               Return: [B, D_a] predicted noise
               '''
+              if self.add_noise:
+                     condition += torch.randn_like(condition, device=self.device)
               noise_pred = self.policy(xt, t, imgs, condition, state)
               return noise_pred
        

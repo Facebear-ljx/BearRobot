@@ -52,6 +52,8 @@ def get_args():
        parser.add_argument('--add_spatial_coordinates', default=False, type=boolean, help='add spatial coordinates to the image')
        parser.add_argument('--film_fusion', default=False, type=boolean, help='add film condition to the decoder')
        
+       # cross-modal part
+       parser.add_argument('--add_noise', default=False, type=boolean, help='add gaussian noise in uni-modal training')
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    

@@ -1,9 +1,10 @@
 bs=64
 ws=2
-text_encoder=DecisionNCE-T
+text_encoder=DecisionNCE-V
 for seed in 42; do
+export MUJOCO_GL="osmesa"
 export CUDA_VISIBLE_DEVICES=1
-export WANDB_API_KEY=cfbf81ce9bd7daca9d32f4bd1dbf26e8c93310c3
+export WANDB_API_KEY=0d4d8e6f87ec9508a673bb4f0d117bf6a79a9945
 torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_example_libero.py \
     --dataset_name 'libero_goal' \
     --algo_name 'diffusion visual motor' \
@@ -27,14 +28,15 @@ torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_examp
     --world_size $ws \
     --lr 0.0003 \
     --val_freq 10000000 \
-    --eval_freq 25000 \
+    --eval_freq 5000000000 \
     --resume None \
     --wandb True \
-    --steps 200000 \
+    --steps 600000 \
     --save True \
-    --save_freq 50000 \
+    --save_freq 40000 \
     --T 25 \
-    --save_path ../experiments/libero/libero_goal/diffusion/resnet34_wstate_0613_$text_encoder \
-    --log_path ../experiments/libero/libero_goal/diffusion/resnet34_wstate_0613_$text_encoder \
-    --port 2050
+    --save_path ../experiments/libero/libero_goal/diffusion/corrupt_0709_03_$text_encoder \
+    --log_path ../experiments/libero/libero_goal/diffusion/corrupt_0709_03_$text_encoder \
+    --port 2077 \
+    --add_noise True 
 done

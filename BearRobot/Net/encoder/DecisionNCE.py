@@ -58,14 +58,20 @@ class DecisionNCE_lang():
 
 
 class DecisionNCE_visual_diff():
-    def __init__(self, mm_encoder: DecisionNCE_encoder):
-        super().__init__()
-        self.mm_encoder = mm_encoder
-        self.mm_encoder.eval()
+	def __init__(self, mm_encoder: DecisionNCE_encoder):
+		super().__init__()
+		self.mm_encoder = mm_encoder
+		self.mm_encoder.eval()
 
-    def embed_frame(self, img_begin, img_end):
-       image_feature = self.mm_encoder.encode_image(img_begin)
-       image_feature_end = self.mm_encoder.encode_image(img_end)
-       image_features_diff = image_feature_end - image_feature
-       return image_features_diff
+	def embed_frame(self, img_begin, img_end):
+		image_feature = self.mm_encoder.encode_image(img_begin)
+		image_feature_end = self.mm_encoder.encode_image(img_end)
+		image_features_diff = image_feature_end - image_feature
+		return image_features_diff
+
+	@torch.no_grad()
+	def embed_text(self, langs: list):
+		lang_features = self.mm_encoder.embed_text(langs)
+		return lang_features
+
               
