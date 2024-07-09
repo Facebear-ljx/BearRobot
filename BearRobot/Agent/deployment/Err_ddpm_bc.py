@@ -14,6 +14,8 @@ from BearRobot.Net.my_model.t5 import T5Encoder
 from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang, DecisionNCE_visual_diff
 from data.libero.data_process import demo2frames
 
+from V_network import V_model
+
 frame_length_dic = demo2frames.frame_counts_dict()
 def extract(a, x_shape):
        '''
@@ -170,7 +172,7 @@ class DDPM_BC(BaseAgent):
               return xt
        
        @torch.no_grad()
-       def p_sample(self, xt: torch.Tensor, t: torch.Tensor, noise_pred: torch.Tensor, guidance_strength=0, clip_sample=False, ddpm_temperature=1.):
+       def  p_sample(self, xt: torch.Tensor, t: torch.Tensor, noise_pred: torch.Tensor, guidance_strength=0, clip_sample=False, ddpm_temperature=1.):
               """
               sample xt-1 from xt, p(xt-1|xt)
               
@@ -232,7 +234,7 @@ class VLDDPM_BC(DDPM_BC):
               beta: str='cosine',  
               T: int=5,
               ac_num: int=1,
-              text_encoder: str="T5",
+              text_encoder: str="DecisionNCE-T",
               device = 'cuda',
               *args, **kwargs
        ):
@@ -322,9 +324,23 @@ class VLDDPM_BC(DDPM_BC):
               noise_pred = self.policy(xt, t, imgs, condition, state)
               return noise_pred
        
-       
+       def get_best_actions(B, actions, s_avoid):
+              s_avoid_tensor = torch.stack(s_avoid)
+
+              actions_expanded = actions.unsqueeze(2)  #[B, num, 1, D_a]
+              s_avoid_expanded = s_avoid_tensor.unsqueeze(0).unsqueeze(0)  # [1, 1, len(s_avoid), D_s]
+
+              distances = torch.norm(actions_expanded - s_avoid_expanded, dim=-1)  # [B, num, len(s_avoid)]
+
+              min_distances, _ = torch.min(distances, dim=-1)  # [B, num]
+
+              best_action_indices = torch.argmax(min_distances, dim=-1)  # [B]
+
+              best_actions = actions[torch.arange(B), best_action_indices]  # [B, D_a]
+
+              return best_actions.view(B, -1, actions.shape[-1])
        @torch.no_grad()
-       def ddpm_sampler(self, shape, imgs: torch.Tensor, lang: list, state: torch.Tensor=None, guidance_strength=0, clip_sample=False, img_begin=None, img_end=None, img_goal=False):
+       def ddpm_sampler(self, shape, imgs: torch.Tensor, lang: list, state: torch.Tensor=None, guidance_strength=0, clip_sample=False, img_begin=None, img_end=None, img_goal=False, s_avoid=None):
               """
               sample x0 from xT, reverse process. Note this ddpm_sampler is different from the original ddpm_sampler as the condition type including both img & lang
               
@@ -340,46 +356,42 @@ class VLDDPM_BC(DDPM_BC):
               """
               x = torch.randn(shape, device=self.device)
               if img_goal:
-                     if img_begin != None and img_end != None:
+                     if img_begin is not None and img_end is not None:
                             cond = self.frame_diff_encoder.embed_frame(img_begin, img_end)
                      else:
                             raise ValueError("img_begin or img_end is None")
               else:
                      cond = self.lang_encoder.embed_text(lang) if self.lang_encoder is not None else lang        
-              # cond = cond.repeat(x.shape[0], 1)
-              # imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
               
               for t in reversed(range(self.num_timesteps)):
                      t_tensor = torch.tensor([t]).unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
                      noise_pred = self.predict_noise(x, t_tensor, imgs, cond, state)
                      x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), noise_pred, clip_sample=clip_sample)
               return x
-       
 
        @torch.no_grad()
-       def get_action(self, imgs, lang, state=None, num=1, t=1, k=0.25, clip_sample=True, img_begin=None, img_end=None, img_goal=False):
+       def get_action(self, imgs, lang, state=None, num=1, t=1, k=0.25, clip_sample=True, img_begin=None, img_end=None, img_goal=False, s_avoid=[]):
               if not isinstance(imgs, torch.Tensor):
-                # transform lists to torch.Tensor
-                imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
+                     # transform lists to torch.Tensor
+                     imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
               else:
-                imgs = imgs.to('cuda')
+                     imgs = imgs.to('cuda')
 
+              if s_avoid == []:
+                     num = num
+              else:
+                     num = 20 # number of samples (K in the essay)
+                     
               B, F, V, C, H, W = imgs.shape
+
               try:
-                   s_dim = self.policy.s_dim
+                     output_dim = self.policy.output_dim
               except:
-                   s_dim = self.policy.module.s_dim
-              state = torch.from_numpy(state.astype(np.float32)).view(-1, s_dim) if state is not None else None
-              state = ((state - self.s_mean) / self.s_std).to('cuda') if state is not None else None
-            
-              try:
-                   output_dim = self.policy.output_dim
-              except:
-                   output_dim = self.policy.module.output_dim
+                     output_dim = self.policy.module.output_dim
               
               # use img goal or language goal
               if img_goal:
-                     if img_begin != None and img_end != None:
+                     if img_begin is not None and img_end is not None:
                             if len(img_begin.shape) == 3:
                                    img_begin_pools = img_begin.unsqueeze(0).repeat(B, 1, 1, 1)
                             elif len(img_begin.shape) == 4 and img_begin.shape[0] == B:
@@ -387,14 +399,24 @@ class VLDDPM_BC(DDPM_BC):
                             else:
                                    raise ValueError(f"Please check the shape of img_begin: {img_begin.shape}")
                             img_end_pools = img_end.unsqueeze(0).repeat(B, 1, 1, 1) 
-                            action = self.ddpm_sampler((B, output_dim), imgs,lang,state, clip_sample=clip_sample,img_begin=img_begin_pools,img_end=img_end_pools, img_goal=True).detach().cpu()
+                            if s_avoid != []:
+                                   state = state.unsqueeze(1).repeat(1,num,1).reshape(B*num,-1)
+                            else:
+                                   state = state
+                            action = self.ddpm_sampler((B, output_dim), imgs, lang, state, clip_sample=clip_sample, img_begin=img_begin_pools, img_end=img_end_pools, img_goal=True, s_avoid=s_avoid).detach().cpu().reshape()
                             action = action.view(B, -1, 7)
                      else:
                             raise ValueError("img_begin or img_end is None")
               else:
-                     action = self.ddpm_sampler((B, output_dim), imgs, [lang] * B, state, clip_sample=clip_sample).detach().cpu()
+                     # if s_avoid != []:
+                     #        state = state.unsqueeze(1).repeat(1,num,1).reshape(B*num,-1) # [B x num,D_a]
+                     # else:
+                     #        state = state
+                     action = self.ddpm_sampler((B, output_dim), imgs, [lang] * B, state, clip_sample=clip_sample, s_avoid=s_avoid).detach().cpu()
                      action = action.view(B, -1, 7)
 
+              # if s_avoid != []:
+              #        action = self.get_best_actions(B,action,s_avoid)
               
               B, N, D_a = action.shape
               a_max = self.a_max.repeat(B, N, 1)
@@ -404,48 +426,53 @@ class VLDDPM_BC(DDPM_BC):
               
               action = (action + 1) * (a_max - a_min) / 2 + a_min
               action = self.get_ac_action(action.numpy(), t, k)
-              # action = action * a_std + a_mean
               return action
+
+       
        
 class IDQL_Agent(BaseAgent):
        def __init__(
               self, 
               policy_model: torch.nn.Module,
-              v_model: torch.nn.Module, 
-              q_models: torch.nn.Module,
               schedule: str='vp', 
               num_timesteps: int=5,
               num_sample: int=64,
-              gamma: float=0.99,
+              gamma: float=1,
               expectile: float=0.5,
-              K: int=60
+              k: float=0.2,
+              s_dim: int=9,
+              device = 'cuda',
+              num_episodes = 10,
+              *args, **kwargs
        ):       
               super().__init__(
                      policy_model,
-                     v_model,
-                     q_models,
+                     v_model=None,
+                     q_models=None,
                      gamma=gamma
               )
-              
-              vlddpm_policy = VLDDPM_BC(policy_model, schedule=schedule, num_timesteps=num_timesteps)
-              self.policy = vlddpm_policy
-              
               self.expectile = expectile
               self.num_sample = num_sample
               self.device = self.policy.device  
+              self.device = device
+              self.s_dim = s_dim
               
-              self.estimate_T = -1
-              self.count_T = 0 
-              self.K = K
+              self.v_model = V_model(state_dim=s_dim).to(self.device)
+              
+              vlddpm_policy = VLDDPM_BC(policy_model, schedule=schedule, num_timesteps=num_timesteps, **kwargs)
+              self.policy = vlddpm_policy
+              
+              
+
 
        def get_target_distribution(self,b):
               target_distribution = torch.zeros(50)
               if b == 0:
                      target_distribution[b] = 2/3
                      target_distribution[b + 1] = 1/3
-              elif b == 50:
-                     target_distribution[b] = 2/3
-                     target_distribution[b - 1] = 1/3
+              elif b >= 49:
+                     target_distribution[-1] = 2/3
+                     target_distribution[-2] = 1/3
               else:
                      target_distribution[b - 1] = 1/3
                      target_distribution[b] = 1/3
@@ -453,7 +480,7 @@ class IDQL_Agent(BaseAgent):
               return target_distribution # [0% 2% 4% ... 98%] shape (50,)
        
               
-       def v_loss(self, imgs: torch.Tensor, state: torch.Tensor, t: int=0, T: int=100):
+       def v_loss(self, imgs: torch.Tensor, state: torch.Tensor, t: torch.Tensor, T: torch.Tensor):
               # Input:
               # imgs: [B, F, V, C, H, W] batch of frames of different views
               # state: [B, D_s] batch of robot arm x,y,z, gripper state
@@ -468,24 +495,28 @@ class IDQL_Agent(BaseAgent):
               imgs_tuple = torch.chunk(imgs, 2, dim=1)
               image_1 = imgs_tuple[0].squeeze(1) # [B, C, H, W] 
               image_2 = imgs_tuple[1].squeeze(1) # [B, C, H, W]
-
+              
+              
               # change a style
               # T_list = [frame_length_dic["/".join(sample["D435_image"].split("/")[3:5])] for sample in batch] 
               # t_list = [int((sample["D435_image"].split("/")[-1]).replace(".jpg","")) for sample in batch]
               # b_list = [int(round((t / T) / 0.02)) for t, T in zip(t_list, T_list)]
               
               # calculate b
-              b = torch.round(t/T/0.02) 
-              target_distributions = torch.stack([self.get_target_distribution(int(i)) for i in b])
+              t = torch.Tensor(t).to(self.device)
+              T = torch.Tensor(T).to(self.device)
+              b = torch.round(t/T/0.02)
+  
+              target_distributions = torch.stack([self.get_target_distribution(int(i)) for i in b]).to(self.device)
               
               # calculate v
-              v = self.v_model(image_1, image_2, state) # [B, 50]
+              v = self.v_model(image_1, image_2, state).to(self.device) # [B, 50]
               
               # 1/3 is neglected
               # loss = F.cross_entropy(v, target_distributions.argmax(dim=1)) 
               loss = F.cross_entropy(v, target_distributions)
               
-              return loss, v.mean(dim=-1)
+              return loss
 
        
        def q_loss(self, s, a, r, next_s, d):
@@ -511,36 +542,16 @@ class IDQL_Agent(BaseAgent):
        
        
        @torch.no_grad()
-       def get_action(self, imgs, lang, state=None, current_time=0, num=1, t=1, k=0.25, clip_sample=True, img_begin=None, img_end=None, img_goal=False):
+       def get_action(self, imgs, lang, state=None, current_time: torch.Tensor=None, num=1, t=1, k=0.25, clip_sample=True, img_begin=None, img_end=None, img_goal=False,s_avoid = None):
               
-              # c\resize images
-              imgs = imgs.squeeze(1) # [B, V, C, H, W]
-              imgs_tuple = torch.chunk(imgs, 2, dim=1)
-              image_1 = imgs_tuple[0].squeeze(1) # [B, C, H, W] 
-              image_2 = imgs_tuple[1].squeeze(1) # [B, C, H, W]
-    
-              # estimate traj T
-              self.count_T += 1
-              T = current_time / self.v_model(image_1, image_2, state).argmax(dim=1).item()
-              if self.estimate_T < 0:
-                     self.estimate_T = T
-              else:
-                     self.estimate_T = self.estimate_T + (T - self.estimate_T) / self.count_T
               
               # ddpm agent
               if img_goal:
-                     action = self.policy.get_action(imgs, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal)
+                     action = self.policy.get_action(imgs, None, state=state, t=t, k=0.25, img_begin=img_begin, img_end = img_end, img_goal=img_goal,s_avoid=s_avoid)
               else:
-                     action = self.policy.get_action(imgs, lang, state=state, t=t, k=0.25)
+                     action = self.policy.get_action(imgs, lang, state=state, t=t, k=0.25,s_avoid=s_avoid)
 
-              # not in use
-              # state = state.repeat(actions.shape[0], 1)
-              # qs = torch.cat(self.q_models_target(state, actions), axis=1).min(axis=1)[0]
-              # idx = torch.argmax(qs)
-              # action = actions[idx]
-              
               return action
-              
               
               
 
