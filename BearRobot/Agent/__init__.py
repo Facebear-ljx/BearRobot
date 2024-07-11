@@ -128,6 +128,18 @@ def build_visual_diffusion_mmpretrain(ckpt_path: str, statistics_path: str, wand
         return load_ckpt(agent, ckpt_path)
 
 
+def build_visual_diffsuion_c3(ckpt_path: str, statistics_path: str, cross_modal: bool=True ,wandb_name: str=None, wandb_path: str=None):
+        kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
+        kwargs['add_noise'] = False
+        model = VisualDiffusion(view_num=2,
+                                output_dim=7 * kwargs['ac_num'],
+                                **kwargs).to(0)
+        agent = VLDDPM_BC(model, **kwargs) 
+        agent.get_statistics(statistics_path)
+        agent.get_transform(kwargs['img_size'])
+        return load_ckpt(agent, ckpt_path)
+
+
 # def build_visual_diffusino(ckpt_path: str, statistics_path: str, wandb_name: str=None):
 #         model = VisualDiffusion(img_size=224, 
 #                                 view_num=2, 

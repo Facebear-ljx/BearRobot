@@ -315,10 +315,23 @@ class VLDDPM_BC(DDPM_BC):
                      raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")
               self.device = device
+              
               try:
                      self.add_noise = kwargs['add_noise']
               except:
                      self.add_noise = False
+                     
+              try:
+                     self.minus_mean = kwargs['minus_mean']
+                     self.mean_data_path = kwargs['mean_data_path']
+              except:
+                     self.minus_mean = False
+                     self.mean_data_path = 'WRONG LOGIC PATH'
+
+              if self.minus_mean:
+                     self.avg_data = np.load(self.mean_data_path)
+                     self.mean_traj_emb = self.avg_data['mean_traj_emb']
+                     self.mean_lang_emb = self.avg_data['mean_lang_emb']
               
        def forward(self, images: torch.Tensor, cond: dict, action_gt: torch.Tensor, state=None, img_goal=False):
               '''
@@ -338,19 +351,19 @@ class VLDDPM_BC(DDPM_BC):
               if img_goal:
                      if img_begin != None and img_end != None:      
                             text_emb_visiual_diff = self.frame_diff_encoder.embed_frame(img_begin, img_end).to(images.device).detach()
-                            loss = self.policy_loss(action_gt, images, text_emb_visiual_diff, state)
+                            loss = self.policy_loss(action_gt, images, text_emb_visiual_diff, state, img_goal)
                             loss_dict = {"policy_loss": loss}
                             return loss_dict
                      else:
                             raise ValueError("img_begin or img_end is None")
               else:
                      text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
-                     loss = self.policy_loss(action_gt, images, text_emb, state)
+                     loss = self.policy_loss(action_gt, images, text_emb, state, img_goal)
                      loss_dict = {"policy_loss": loss}
                      return loss_dict
        
        
-       def policy_loss(self, x0: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None):
+       def policy_loss(self, x0: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None, img_goal: bool=False):
               '''
               calculate ddpm loss
               Input:
@@ -367,13 +380,13 @@ class VLDDPM_BC(DDPM_BC):
               t = torch.randint(0, self.num_timesteps, (batch_size, ), device=self.device)
               xt = self.q_sample(x0, t, noise)
               
-              noise_pred = self.predict_noise(xt, t, imgs, condition, state)
+              noise_pred = self.predict_noise(xt, t, imgs, condition, state, img_goal)
               loss = (((noise_pred - noise) ** 2).sum(axis = -1)).mean()
               
               return loss
        
        
-       def predict_noise(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None):
+       def predict_noise(self, xt: torch.Tensor, t: torch.Tensor, imgs: torch.Tensor, condition: torch.Tensor, state: torch.Tensor=None, img_goal: bool=False):
               '''
               calculate ddpm loss
               
@@ -386,9 +399,27 @@ class VLDDPM_BC(DDPM_BC):
               
               Return: [B, D_a] predicted noise
               '''
-              if self.add_noise:
-                     condition += torch.randn_like(condition, device=self.device)
-              noise_pred = self.policy(xt, t, imgs, condition, state)
+              mod_cond = condition.clone()
+              
+              # corrupt
+              if self.add_noise and self.training:
+                     print("add noise")
+                     std_dev = torch.sqrt(torch.tensor(1.34e-9))
+                     condition += torch.randn_like(condition, device=self.device) * std_dev
+                     
+              # collapse
+              if self.minus_mean:
+                     
+                     if img_goal:
+                            mean_cond_emb = torch.from_numpy(self.mean_traj_emb).to(self.device)
+                     else:
+                            mean_cond_emb = torch.from_numpy(self.mean_lang_emb).to(self.device)
+                     # print("before condition: ", mod_cond[0][222])
+                     # print("minus ", mean_cond_emb[222])
+                     mod_cond -= mean_cond_emb
+                     # print("after condition: ", mod_cond[0][222])
+              
+              noise_pred = self.policy(xt, t, imgs, mod_cond, state)
               return noise_pred
        
        
@@ -420,7 +451,7 @@ class VLDDPM_BC(DDPM_BC):
               
               for t in reversed(range(self.num_timesteps)):
                      t_tensor = torch.tensor([t]).unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
-                     noise_pred = self.predict_noise(x, t_tensor, imgs, cond, state)
+                     noise_pred = self.predict_noise(x, t_tensor, imgs, cond, state, img_goal)
                      x = self.p_sample(x, torch.full((shape[0], 1), t, device=self.device), noise_pred, clip_sample=clip_sample)
               return x
        

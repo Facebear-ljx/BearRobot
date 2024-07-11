@@ -16,3 +16,10 @@ dataset/
 pretrained_model/
 *.egg-info/
 *.mp4
+*.hd5
+*.npz
+*.png
+*.jpg
+*.jpeg
+*.TXT
+*.h5

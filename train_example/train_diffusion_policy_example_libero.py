@@ -54,6 +54,8 @@ def get_args():
        
        # cross-modal part
        parser.add_argument('--add_noise', default=False, type=boolean, help='add gaussian noise in uni-modal training')
+       parser.add_argument('--minus_mean', default=False, type=boolean, help='minus the mean of embeddings')
+       parser.add_argument('--mean_data_path', default=None, type=str, help='mean data path')
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    
