@@ -13,7 +13,7 @@ view_list = ['D435_image', 'wrist_image']
 json_path = f'/home/lijx/ljx/robotics/BearRobot/data/libero/{dataset_name}-ac.json'
 base_dir = '/data/libero/data_jpg'
 
-encoder = DecisionNCE_encoder(name="DecisionNCE-T")
+encoder = DecisionNCE_encoder(name="DecisionNCE-T_all_680ep")
 model = DecisionNCE_visual_diff(encoder)
 demo_dict = demo2frames.frame_counts_dict(json_path)
 transform = T.ToTensor()
@@ -56,5 +56,5 @@ text_embed_mean = text_embed_all.mean(0, keepdims=False)
 embeding_info = {"visual_mean": visual_diff_all_mean.tolist(),
                  "text_mean": text_embed_mean.tolist()}
 
-with open("/home/lijx/ljx/robotics/BearRobot/data/libero/embedding.json", 'w') as f:
+with open("/home/lijx/ljx/robotics/BearRobot/data/libero/embedding_all680ep.json", 'w') as f:
     json.dump(embeding_info, f)
