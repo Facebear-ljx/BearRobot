@@ -12,6 +12,7 @@ from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
 from BearRobot.Net.my_model.t5 import T5Encoder
 from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang, DecisionNCE_visual_diff
+from BearRobot.Net.my_model.Align_net import AlignNet
 
 def extract(a, x_shape):
        '''
@@ -307,7 +308,8 @@ class VLDDPM_BC(DDPM_BC):
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.lang_encoder = DecisionNCE_lang(mm_encoder)
               elif text_encoder == "DecisionNCE-V":
-                     text_encoder = 'DecisionNCE-T_all_600ep'
+                     text_encoder = 'DecisionNCE-T_libero_360ep'
+                     # text_encoder = 'DecisionNCE-T_epick'
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder)
                      self.lang_encoder = DecisionNCE_visual_diff(mm_encoder)
@@ -318,8 +320,10 @@ class VLDDPM_BC(DDPM_BC):
               
               try:
                      self.add_noise = kwargs['add_noise']
+                     self.noise_std = kwargs['noise_std']
               except:
                      self.add_noise = False
+                     self.noise_std = 1
                      
               try:
                      self.minus_mean = kwargs['minus_mean']
@@ -328,10 +332,14 @@ class VLDDPM_BC(DDPM_BC):
                      self.minus_mean = False
                      self.mean_data_path = 'WRONG LOGIC PATH'
 
-              if self.minus_mean:
-                     self.avg_data = np.load(self.mean_data_path)
-                     self.mean_traj_emb = self.avg_data['mean_traj_emb']
-                     self.mean_lang_emb = self.avg_data['mean_lang_emb']
+              self.avg_data = np.load(self.mean_data_path)
+              self.mean_traj_emb = self.avg_data['mean_traj_emb']
+              self.mean_lang_emb = self.avg_data['mean_lang_emb']
+                     
+              try:
+                     self.lang_fit_img = kwargs['lang_fit_img']
+              except:
+                     self.lang_fit_img = False
               
        def forward(self, images: torch.Tensor, cond: dict, action_gt: torch.Tensor, state=None, img_goal=False):
               '''
@@ -402,10 +410,9 @@ class VLDDPM_BC(DDPM_BC):
               mod_cond = condition.clone()
               
               # corrupt
-              if self.add_noise and self.training:
-                     print("add noise")
-                     std_dev = torch.sqrt(torch.tensor(1.34e-9))
-                     condition += torch.randn_like(condition, device=self.device) * std_dev
+              # if self.add_noise and self.training:
+              #        std_dev = torch.tensor(self.noise_std)
+              #        condition += torch.randn_like(condition, device=self.device) * std_dev
                      
               # collapse
               if self.minus_mean:
@@ -414,11 +421,26 @@ class VLDDPM_BC(DDPM_BC):
                             mean_cond_emb = torch.from_numpy(self.mean_traj_emb).to(self.device)
                      else:
                             mean_cond_emb = torch.from_numpy(self.mean_lang_emb).to(self.device)
-                     # print("before condition: ", mod_cond[0][222])
-                     # print("minus ", mean_cond_emb[222])
+                     # print("before cond[222]: ", mod_cond[0][222])
                      mod_cond -= mean_cond_emb
-                     # print("after condition: ", mod_cond[0][222])
+                     # print("after cond[222]: ", mod_cond[0][222])
+                     
+                     if self.lang_fit_img:
+                            mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
+                            # print("after plus cond[222]: ", mod_cond[0][222])
+                            
+              if self.add_noise and not self.minus_mean:
+                     mod_cond -= torch.from_numpy(self.mean_lang_emb).to(self.device)
+                     mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
               
+              if not self.training and  not img_goal:
+                     mod_cond.to(self.device)
+                     mod_cond = self.align_net(mod_cond)
+                     
+              mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+              mod_cond += (torch.randn_like(mod_cond, device=self.device) * 0.1)
+              mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+                     
               noise_pred = self.policy(xt, t, imgs, mod_cond, state)
               return noise_pred
        

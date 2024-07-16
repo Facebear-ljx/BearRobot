@@ -19,6 +19,7 @@ from data.libero.data_process import demo2frames
 from data.libero.data_process import get_libero_frame
 from mmengine import fileio
 import io
+import re
 
 EPS = 1e-5
 
@@ -447,6 +448,7 @@ class AIRKitchenDataset():
               mask_aug: bool=False,  # True for IVM training, False for normal training
               transform_list: list=None,  # e.g. [transforms.RandomResizedCrop(224, scale=(0.75, 1), interpolation=Image.BICUBIC)], you can feed your own transform
               img_goal: bool=False,
+              one_demo: bool=False,
        ):
               self.base_dir = base_dir
               self.img_size = img_size
@@ -457,11 +459,25 @@ class AIRKitchenDataset():
               self.ac_num = ac_num
               self.mask_aug = mask_aug
               self.img_goal = img_goal
+              self.one_demo = one_demo
               
               self.datalist = []
               for one_list in datalist:
                      data = openjson(one_list)
-                     self.datalist += data
+                     print("data len: ",len(data))
+                     new_data = []
+                     if self.one_demo:
+                            for dd in data:
+                                   match = dd[f'{view_list[0]}'].endswith('/44.jpg')
+                                   if not match:
+                                          continue
+                                   else:
+                                          # print("dd[f'{view_list[0]}'] ",dd[f'{view_list[0]}'])
+                                          new_data.append(dd)
+                            print("data len (one demo): ",len(new_data))
+                     else:
+                            new_data = data
+                     self.datalist += new_data
                      
               self._statistics(statistics)
               
@@ -647,6 +663,7 @@ def AIRKitchenDataLoader(
        ac_num: int=4,
        transform_list: list=None,
        img_goal: bool=False,
+       one_demo: bool=False,
        **kwargs,
 ):
        dataset = AIRKitchenDataset(base_dir=base_dir,
@@ -658,7 +675,8 @@ def AIRKitchenDataLoader(
                                    norm=norm,
                                    ac_num=ac_num,
                                    transform_list=transform_list,
-                                   img_goal=img_goal)
+                                   img_goal=img_goal,
+                                   one_demo=one_demo)
        
        num_tasks = ddp.get_world_size()
        global_rank = ddp.get_rank()

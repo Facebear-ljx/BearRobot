@@ -13,6 +13,7 @@ from BearRobot.Agent.ACT import ACTAgent
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion, VisualDiffusion_pretrain
 from BearRobot.Net.my_model.ACT_model import ACTModel
 
+from BearRobot.Net.my_model.Align_net import AlignNet
 
 def openjson(path):
        value  = fileio.get_text(path)
@@ -86,7 +87,7 @@ def load_ckpt(agent, ckpt_path):
                 new_ckpt[new_key] = ckpt['model'][key]
 
         ckpt['model'] = new_ckpt
-        agent.load_state_dict(ckpt['model'])
+        agent.load_state_dict(ckpt['model'], strict=False)
         agent.eval()
         return agent.to(0)
 
@@ -128,13 +129,19 @@ def build_visual_diffusion_mmpretrain(ckpt_path: str, statistics_path: str, wand
         return load_ckpt(agent, ckpt_path)
 
 
-def build_visual_diffsuion_c3(ckpt_path: str, statistics_path: str, cross_modal: bool=True ,wandb_name: str=None, wandb_path: str=None):
+def build_visual_diffsuion_c3(ckpt_path: str, statistics_path: str, cross_modal: bool=True , align_net: str=None, wandb_name: str=None, wandb_path: str=None):
         kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
-        kwargs['add_noise'] = False
+        kwargs['device'] = 'cuda:0'
+        if cross_modal and kwargs['add_noise'] and not kwargs['minus_mean']:
+                kwargs['minus_mean'] = True
+                kwargs['lang_fit_img'] = True
         model = VisualDiffusion(view_num=2,
                                 output_dim=7 * kwargs['ac_num'],
                                 **kwargs).to(0)
-        agent = VLDDPM_BC(model, **kwargs) 
+        agent = VLDDPM_BC(model, **kwargs)
+        agent.align_net = AlignNet(1024).to('cuda:0')
+        agent.align_net.load_state_dict(torch.load(align_net, map_location='cuda:0'))
+        agent.align_net.eval() 
         agent.get_statistics(statistics_path)
         agent.get_transform(kwargs['img_size'])
         return load_ckpt(agent, ckpt_path)

@@ -7,6 +7,9 @@ import torch.nn.functional as F
 import h5py
 from tqdm import tqdm
 from itertools import count
+import umap
+import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 from BearRobot.utils.dataset.dataloader import AIRKitchenDataLoader
 from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang, DecisionNCE_visual_diff
 
@@ -22,8 +25,8 @@ LIBERO_DATASETS = {'libero_goal': ["libero_goal"],
 def get_args():
     parser = argparse.ArgumentParser()
     
-    parser.add_argument('--dataset_name', default='libero_goal', type=str, help='dataset name')
-    parser.add_argument('--nce_model', default='DecisionNCE-T_all_600ep', type=str, help='NCE model')
+    parser.add_argument('--dataset_name', default='libero130', type=str, help='dataset name')
+    parser.add_argument('--nce_model', default='DecisionNCE-T_libero_360ep', type=str, help='NCE model')
     parser.add_argument('--device', default='cuda:0', type=str, help='device')
     parser.add_argument('--steps', default=1000, type=int, help='steps')
     parser.add_argument('--batch_size', default=64, type=int, help='batch size')
@@ -56,7 +59,8 @@ def main(args):
         datalist=[json_path],
         view_list=view_list,
         img_goal=img_goal,
-        batch_size=args.batch_size
+        batch_size=args.batch_size,
+        one_demo=True
     )
     
     # DecisionNCE
@@ -71,8 +75,16 @@ def main(args):
     mean_cos_sim = None
     count = 0
     
+    # umap
+    lang_embs = np.empty((0, 1024))
+    traj_embs = np.empty((0, 1024))
+    labels = []
+    label_dict = {}
+    label_count = 0
+    num_instructions = 10    
+    
     # load mean
-    data = np.load("/home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130_batch64/mean_embeddings_final.npz")
+    data = np.load("/home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/mean_embeddings_final.npz")
     avg_taj = torch.from_numpy(data['mean_traj_emb']).to('cpu')
     avg_lang = torch.from_numpy(data['mean_lang_emb']).to('cpu')
 
@@ -98,8 +110,8 @@ def main(args):
             traj_emb = nce_encoder.embed_frame(img_begin,img_end).to('cpu').detach()
             lang_emb -= avg_lang
             traj_emb -= avg_taj
-            lang_emb = F.normalize(lang_emb, dim=-1)
-            traj_emb = F.normalize(traj_emb, dim=-1)
+            # lang_emb = F.normalize(lang_emb, dim=-1)
+            # traj_emb = F.normalize(traj_emb, dim=-1)
             noise_emb = lang_emb - traj_emb
             cos_sim = F.cosine_similarity(noise_emb[1:], noise_emb[:-1], dim=-1)
 
@@ -171,7 +183,50 @@ def main(args):
 
                         # 保存全局计数器
                         main_group.attrs['counter'] = global_counter
+                        
+                for i in range(args.batch_size):
+                    lang_embs = np.vstack((lang_embs, lang_emb[i].numpy()))
+                    traj_embs = np.vstack((traj_embs, traj_emb[i].numpy()))
+                    label = lang[i]
+                    if label not in label_dict:
+                        label_dict[label] = label_count
+                        label_count += 1
+                    labels.append(label_dict[label])
 
+    # umap save
+    if args.umap:
+        labels = np.array(labels)
+        np.savez(f'{directory_path}/umap.npz', lang_embs=lang_embs, traj_embs=traj_embs, labels=labels)
+        print("UMAP embeddings saved to 'umap.npz'")
+        
+        # UMAP降维
+        umap_model = umap.UMAP(n_components=2, random_state=42)
+        lang_umap = umap_model.fit_transform(lang_embs)
+        img_umap = umap_model.fit_transform(traj_embs)
+
+        # 定义颜色和形状
+        colors = plt.cm.rainbow(np.linspace(0, 1, num_instructions))
+        markers = ['o', '^']
+
+        # 绘制UMAP分布图
+        plt.figure(figsize=(16, 10))
+        for i in range(num_instructions):
+            idx = labels == i
+            plt.scatter(lang_umap[idx, 0], lang_umap[idx, 1], color=colors[i], marker=markers[0], s=100, label=f'Lang {i}')  # 增大数据点
+            plt.scatter(img_umap[idx, 0], img_umap[idx, 1], color=colors[i], marker=markers[1], s=100, label=f'Img {i}')  # 增大数据点
+
+        # 创建渐变颜色的图例
+        legend_elements = [Line2D([0], [0], color=plt.cm.rainbow(i/num_instructions), lw=4, label=str(i)) for i in range(num_instructions)]
+        plt.legend(handles=legend_elements, title='Instructions', bbox_to_anchor=(1.05, 1), loc='upper left')
+
+        # 设置标题和标签
+        plt.title('UMAP of Lang and Img Embeddings')
+        plt.xlabel('UMAP Dimension 1')
+        plt.ylabel('UMAP Dimension 2')
+
+        # 显示图表
+        plt.savefig(f'{directory_path}/umap.png')
+    
     # resize
     mean_lang_emb = torch.mean(mean_lang_emb, dim=0)
     mean_traj_emb = torch.mean(mean_traj_emb, dim=0)

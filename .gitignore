@@ -23,3 +23,5 @@ pretrained_model/
 *.jpeg
 *.TXT
 *.h5
+*.pth
+*.ipynb

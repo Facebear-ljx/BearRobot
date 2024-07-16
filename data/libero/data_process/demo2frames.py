@@ -10,6 +10,7 @@ def frame_counts_dict(json_path='/home/dodo/ljx/BearRobot/data/libero/libero_goa
     pattern = re.compile(r'.+/(libero_.+)/(.+_demo)/demo_(\d+)/')
     for item in data:
         match = pattern.search(item['D435_image'])
+        # match = pattern.search(item['wrist_image'])
         if match:
             task_suite = match.group(1)
             instruction = match.group(2)

@@ -3,7 +3,7 @@ import os
 import re
 import matplotlib.pyplot as plt
 
-dir_name = 'libero130_15k_64'
+dir_name = 'libero130'
 
 def numerical_sort(value):
     numbers = re.findall(r'\d+', value)

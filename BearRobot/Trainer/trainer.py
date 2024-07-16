@@ -212,7 +212,7 @@ class BCTrainer:
                             
                             # save
                             if self.save:
-                                   if (step + 1) % self.save_freq == 0:
+                                   if (step + 1) % self.save_freq == 0 or (step+1) == steps:
                                           if self.global_rank == 0:
                                                  self.save_model(step, loss_log['train/policy_loss'])
                             
@@ -228,7 +228,7 @@ class BCTrainer:
                                           evaluate = True
                                    
                                    if evaluate:
-                                          self.evaluator.eval_episodes(self.agent, step, self.save_path, self.img_goal) 
+                                          self.evaluator.eval_episodes(self.agent, step, self.save_path, img_goal=self.img_goal) 
                             
                             if self.args.ddp:
                                    torch.distributed.barrier()
