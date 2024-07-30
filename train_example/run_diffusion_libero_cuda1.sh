@@ -1,14 +1,14 @@
 bs=64
 ws=2
 text_encoder=DecisionNCE-V
-file_name=collapse_corrupt_epick_libero130_0715_02
+file_name=libero_goal_NCE_10800ep_cos0.6_0729_01
 
 for seed in 42; do
 export MUJOCO_GL="osmesa"
 export CUDA_VISIBLE_DEVICES=1
 export WANDB_API_KEY=cdad4c82816c6da591e611ae4ac5a07ee7f4611a
 torchrun --standalone --nnodes=1 --nproc_per_node=1 train_diffusion_policy_example_libero.py \
-    --dataset_name 'libero130' \
+    --dataset_name 'libero_goal' \
     --algo_name 'diffusion visual motor' \
     --ddp False \
     --img_size 128 \
@@ -30,10 +30,10 @@ torchrun --standalone --nnodes=1 --nproc_per_node=1 train_diffusion_policy_examp
     --world_size $ws \
     --lr 0.0003 \
     --val_freq 10000000 \
-    --eval_freq 90000000 \
+    --eval_freq 50000 \
     --resume None \
     --wandb True \
-    --steps 400000 \
+    --steps 200000 \
     --save True \
     --save_freq 50000 \
     --T 25 \
@@ -41,14 +41,14 @@ torchrun --standalone --nnodes=1 --nproc_per_node=1 train_diffusion_policy_examp
     --log_path ../experiments/libero/libero_goal/diffusion/$file_name \
     --port 2077 \
     --add_noise True \
-    --noise_std 0.16 \
     --minus_mean True \
-    --mean_data_path /home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/mean_DecisionNCE-T_epick.npz
+    --mean_data_path /home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/mean_DecisionNCE-T_all_endbegin_10800ep.npz \
+    --noise_data_path /home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/noise_DecisionNCE-T_all_endbegin_10800ep.npz
 done
 
-# wait
+wait
 
-# file_name2=collapse_corrupt_epick_spatial_0715_01
+file_name2=collapse_corrupt_epick_spatial_0715_01
 
 # for seed in 42; do
 # export MUJOCO_GL="osmesa"

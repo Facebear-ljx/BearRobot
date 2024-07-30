@@ -76,6 +76,31 @@ def vp_beta_schedule(timesteps):
        betas = 1 - alpha
        return betas       
 
+def generate_vector_with_given_cosine_similarity(vector, target_similarity):
+       """
+       生成一个与给定向量有特定余弦相似度的向量。
+       
+       :param vector: 原始向量，大小为 [10, 1024]
+       :param target_similarity: 目标余弦相似度，大小为 [10]
+       :return: 与原始向量有指定余弦相似度的向量
+       """
+       # print("vector size:", vector.size())
+       # print("target_similarity size:", target_similarity.size())
+
+       # 归一化原始向量
+       unit_vector = vector / torch.norm(vector, dim=1, keepdim=True)
+       
+       # 生成一个与原始向量正交的随机向量
+       random_vector = torch.randn_like(vector)
+       random_vector -= torch.sum(random_vector * unit_vector, dim=1, keepdim=True) * unit_vector
+       random_vector /= torch.norm(random_vector, dim=1, keepdim=True)
+       
+       # 线性组合得到目标向量
+       target_vector = (target_similarity.view(-1, 1) * unit_vector + 
+                            torch.sqrt(1 - target_similarity.view(-1, 1)**2) * random_vector)
+       
+       return target_vector
+       
 
 SCHEDULE = {'linear': linear_beta_schedule,
             'cosine': cosine_beta_schedule,
@@ -308,8 +333,11 @@ class VLDDPM_BC(DDPM_BC):
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.lang_encoder = DecisionNCE_lang(mm_encoder)
               elif text_encoder == "DecisionNCE-V":
-                     text_encoder = 'DecisionNCE-T_libero_360ep'
+                     # text_encoder = 'DecisionNCE-T_libero_360ep'
+                     # text_encoder = 'DecisionNCE-T_all_680ep'
                      # text_encoder = 'DecisionNCE-T_epick'
+                     # text_encoder = 'DecisionNCE-T_all_filter_1200ep'
+                     text_encoder = 'DecisionNCE-T_all_endbegin_10800ep'
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder)
                      self.lang_encoder = DecisionNCE_visual_diff(mm_encoder)
@@ -320,26 +348,32 @@ class VLDDPM_BC(DDPM_BC):
               
               try:
                      self.add_noise = kwargs['add_noise']
-                     self.noise_std = kwargs['noise_std']
+                     self.noise_data_path = kwargs['noise_data_path']
+                     self.noise_data = np.load(self.noise_data_path)
+                     self.noise_std = self.noise_data['std_noise']
               except:
                      self.add_noise = False
-                     self.noise_std = 1
+                     self.noise_data_path = 'WRONG LOGIC PATH'
                      
               try:
                      self.minus_mean = kwargs['minus_mean']
                      self.mean_data_path = kwargs['mean_data_path']
+                     self.avg_data = np.load(self.mean_data_path)
+                     self.mean_traj_emb = self.avg_data['mean_traj_emb']
+                     self.mean_lang_emb = self.avg_data['mean_lang_emb']
               except:
                      self.minus_mean = False
                      self.mean_data_path = 'WRONG LOGIC PATH'
-
-              self.avg_data = np.load(self.mean_data_path)
-              self.mean_traj_emb = self.avg_data['mean_traj_emb']
-              self.mean_lang_emb = self.avg_data['mean_lang_emb']
-                     
+      
               try:
                      self.lang_fit_img = kwargs['lang_fit_img']
               except:
                      self.lang_fit_img = False
+                     
+              # sort_file = np.load('/home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/sort_index_random_100_DecisionNCE-T_all_680ep.npz')
+              # self.sort_data = sort_file['sort_index']
+              # self.sort_data = torch.from_numpy(self.sort_data).to(self.device).to(torch.long)
+              # self.sort_data = self.sort_data[:256]
               
        def forward(self, images: torch.Tensor, cond: dict, action_gt: torch.Tensor, state=None, img_goal=False):
               '''
@@ -421,29 +455,60 @@ class VLDDPM_BC(DDPM_BC):
                             mean_cond_emb = torch.from_numpy(self.mean_traj_emb).to(self.device)
                      else:
                             mean_cond_emb = torch.from_numpy(self.mean_lang_emb).to(self.device)
-                     # print("before cond[222]: ", mod_cond[0][222])
                      mod_cond -= mean_cond_emb
-                     # print("after cond[222]: ", mod_cond[0][222])
                      
-                     if self.lang_fit_img:
-                            mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
-                            # print("after plus cond[222]: ", mod_cond[0][222])
+                     # if self.lang_fit_img:
+                     #        mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
+                     #        print("after plus cond[222]: ", mod_cond[0][222])
                             
-              if self.add_noise and not self.minus_mean:
-                     mod_cond -= torch.from_numpy(self.mean_lang_emb).to(self.device)
-                     mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
+              # if self.add_noise and not self.minus_mean:
+              #        mod_cond -= torch.from_numpy(self.mean_lang_emb).to(self.device)
+              #        mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
               
-              if not self.training and  not img_goal:
-                     mod_cond.to(self.device)
-                     mod_cond = self.align_net(mod_cond)
+              # if not self.training and  not img_goal:
+              #        mod_cond.to(self.device)
+              #        mod_cond = self.align_net(mod_cond)
+              
+              # noise add method
+              if self.add_noise and self.training:
                      
-              mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
-              mod_cond += (torch.randn_like(mod_cond, device=self.device) * 0.1)
-              mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+                     # std noise
+                     dtype = mod_cond.dtype
+                     gaussian_noise = np.random.normal(loc=0.0, scale=self.noise_std*0.1, size=self.noise_std.shape)
+                     mod_cond = mod_cond + torch.from_numpy(gaussian_noise).to(self.device).to(dtype)
+                     mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+                     
+                     # rand_cos = 0.6 + 0.4*torch.rand(int(mod_cond.shape[0])).to(self.device)
+                     # mod_cond = generate_vector_with_given_cosine_similarity(mod_cond, rand_cos)
+              
+              else:
+                     mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+                     
+              
+              # mod_cond = self.rank_transform_by_abs(mod_cond)
+              # mod_cond = mod_cond[:, self.sort_data]
+                     
+              # mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+              # rand_cos = 0.7 + 0.3*torch.rand(int(mod_cond.shape[0])).to(self.device)
+              # mod_cond = generate_vector_with_given_cosine_similarity(mod_cond, rand_cos)
+              
+              # mod_cond += (torch.randn_like(mod_cond, device=self.device) * 0.1)
+              # mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
                      
               noise_pred = self.policy(xt, t, imgs, mod_cond, state)
               return noise_pred
-       
+
+
+       def rank_transform_by_abs(self,tensor):
+              b, n = tensor.shape
+              ranks = torch.empty_like(tensor, dtype=torch.long).to(self.device)
+              
+              for i in range(b):
+                     sorted_indices = torch.argsort(torch.abs(tensor[i]))
+                     ranks[i, sorted_indices] = torch.arange(n, dtype=torch.long, device=self.device)
+              
+              ranks = (ranks - 512.0) / 512.0
+              return ranks
        
        @torch.no_grad()
        def ddpm_sampler(self, shape, imgs: torch.Tensor, lang: list, state: torch.Tensor=None, guidance_strength=0, clip_sample=False, img_begin=None, img_end=None, img_goal=False):

@@ -139,9 +139,9 @@ def build_visual_diffsuion_c3(ckpt_path: str, statistics_path: str, cross_modal:
                                 output_dim=7 * kwargs['ac_num'],
                                 **kwargs).to(0)
         agent = VLDDPM_BC(model, **kwargs)
-        agent.align_net = AlignNet(1024).to('cuda:0')
-        agent.align_net.load_state_dict(torch.load(align_net, map_location='cuda:0'))
-        agent.align_net.eval() 
+        # agent.align_net = AlignNet(1024).to('cuda:0')
+        # agent.align_net.load_state_dict(torch.load(align_net, map_location='cuda:0'))
+        # agent.align_net.eval() 
         agent.get_statistics(statistics_path)
         agent.get_transform(kwargs['img_size'])
         return load_ckpt(agent, ckpt_path)

@@ -7,17 +7,17 @@ def get_args():
         parser = argparse.ArgumentParser(description='args for err evaluation')
         
         # crucial eval parameters
-        parser.add_argument('--cross_modal', default=True, type=bool, help='whether to use cross-modal evaluation')
+        parser.add_argument('--cross_modal', default=False, type=bool, help='whether to use cross-modal evaluation')
         
-        parser.add_argument('--basic_path', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/experiments/libero/libero_goal/diffusion/collapse_corrupt_epick_object_0714_01/', type=str, help='path to the checkpoint and statistics and wandb')
+        parser.add_argument('--basic_path', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/experiments/libero/libero_goal/diffusion/NCE_all_680ep_cos0.7_256dim_0722_03/', type=str, help='path to the checkpoint and statistics and wandb')
         parser.add_argument('--statistic_name', default='statistics.json', type=str, help='statistics file name')
         parser.add_argument('--ckpt_name', default='latest.pth', type=str, help='checkpoint file name')
-        parser.add_argument('--save_path', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/experiments/libero/libero_goal/diffusion/collapse_corrupt_epick_object_0714_01/', type=str, help='path to save the evaluation results')
-        parser.add_argument('--json_path', default='/home/dodo/ljx/BearRobot/data/libero/libero_object-ac.json', type=str, help='path to the json file')
-        parser.add_argument('--task_suite_name', default='libero_object', type=str, help='task suite name')
+        parser.add_argument('--save_path', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/experiments/libero/libero_goal/diffusion/NCE_all_680ep_cos0.7_256dim_0722_03/', type=str, help='path to save the evaluation results')
+        parser.add_argument('--json_path', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/libero_goal-ac.json', type=str, help='path to the json file')
+        parser.add_argument('--task_suite_name', default='libero_goal', type=str, help='task suite name')
         parser.add_argument('--num_episodes', default=10, type=int, help='number of episodes to evaluate')
         parser.add_argument('--eval_horizon', default=300, type=int, help='horizon for evaluation')
-        parser.add_argument('--align_net', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/align_net_steps100_libero_object_DecisionNCE-T_epick.pth', type=str, help='align net pth model path')
+        parser.add_argument('--align_net', default='/home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/norm_align_net_steps3000_libero130_DecisionNCE-T_epick.pth', type=str, help='align net pth model path')
             
         args = parser.parse_args()    
         return args   

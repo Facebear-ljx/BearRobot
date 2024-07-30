@@ -1,7 +1,7 @@
 bs=64
 ws=2
 text_encoder=DecisionNCE-V
-file_name=collapse_corrupt_libero_norm_0716_02
+file_name=libero_goal_NCE_10800ep_std0.1_0730_01
 
 for seed in 42; do
 export MUJOCO_GL="osmesa"
@@ -30,25 +30,25 @@ torchrun --standalone --nnodes=1 --nproc_per_node=1 train_diffusion_policy_examp
     --world_size $ws \
     --lr 0.0003 \
     --val_freq 10000000 \
-    --eval_freq 99999999999 \
+    --eval_freq 50000 \
     --resume None \
     --wandb True \
-    --steps 200000 \
+    --steps 100000 \
     --save True \
-    --save_freq 20000 \
+    --save_freq 50000 \
     --T 25 \
     --save_path ../experiments/libero/libero_goal/diffusion/$file_name \
     --log_path ../experiments/libero/libero_goal/diffusion/$file_name \
     --port 2077 \
     --add_noise True \
-    --noise_std 0.16 \
     --minus_mean True \
-    --mean_data_path /home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/mean_DecisionNCE-T_libero_360ep.npz
+    --mean_data_path /home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/mean_DecisionNCE-T_all_endbegin_10800ep.npz \
+    --noise_data_path /home/dodo/.zh1hao_space/bear_branch/BearRobot/analysis/libero130/noise_DecisionNCE-T_all_endbegin_10800ep.npz
 done
 
-# wait
+wait
 
-# file_name3=collapse_corrupt_0713_01
+file_name3=collapse_corrupt_0713_01
 
 # for seed in 42; do
 # export MUJOCO_GL="osmesa"

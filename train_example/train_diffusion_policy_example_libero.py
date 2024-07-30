@@ -54,7 +54,7 @@ def get_args():
        
        # cross-modal part
        parser.add_argument('--add_noise', default=False, type=boolean, help='add gaussian noise in uni-modal training')
-       parser.add_argument('--noise_std', default=0.1, type=float, help='noise std')
+       parser.add_argument('--noise_data_path', default=None, type=str, help='noise data path')
        parser.add_argument('--minus_mean', default=False, type=boolean, help='minus the mean of embeddings')
        parser.add_argument('--mean_data_path', default=None, type=str, help='mean data path')
        
@@ -84,8 +84,10 @@ def main(args):
        img_goal = True  if kwargs['text_encoder'] == 'DecisionNCE-V' else False
        dataset_name = kwargs['dataset_name']
        json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac.json'
+       # json_path = f'/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/{dataset_name}-ac.json'
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
+              # base_dir='/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/dataset/',
               datalist=[json_path],
               view_list=view_list,
               img_goal=img_goal,
