@@ -29,8 +29,8 @@ def get_args():
        parser.add_argument('--visual_encoder', default='resnet34', type=str, help='visual encoder backbone, support resnet 18/34/50')
        parser.add_argument('--visual_pretrain', default=False, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--ft_vision', default=False, type=boolean, help='whether tune the visual encoder')
-       
        parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
+       parser.add_argument('--text_encoder', default='DecisionNCE-T', type=str, help='language encoder, support T5, DecisionNCE-T, DecisionNCE-P, DecisionNCE-V')       
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
        parser.add_argument('--discretize_actions', default=False, type=boolean, help='whether discretize_actions the action or not')
        parser.add_argument('--s_dim', default=0, type=int, help='qpos dim, 0 means dont use qpos')
@@ -44,6 +44,15 @@ def get_args():
        parser.add_argument('--add_spatial_coordinates', default=False, type=boolean, help='add spatial coordinates to the image')
        parser.add_argument('--film_fusion', default=False, type=boolean, help='add film condition to the decoder')
        
+       # cross-modal part
+       parser.add_argument('--add_noise', default=False, type=boolean, help='add gaussian noise in uni-modal training')
+       parser.add_argument('--noise_data_path', default=None, type=str, help='noise data path')
+       parser.add_argument('--minus_mean', default=False, type=boolean, help='minus the mean of embeddings')
+       parser.add_argument('--mean_data_path', default=None, type=str, help='mean data path')
+       parser.add_argument('--lang_prop', default="", type=str, help='language proportion')
+       parser.add_argument('--json_copy', default=0, type=int, help='json copy index')
+       parser.add_argument('--cos_noise', default=1.0, type=float, help='cosine noise')
+       parser.add_argument('--cos_noise_decay', default=0.0, type=float, help='cosine noise decay')
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    
@@ -70,6 +79,9 @@ def main(args):
               save_path = args.save_path
               if not os.path.exists(save_path):
                      os.makedirs(save_path)
+                     
+
+                     
        else:
               save_path = None
 
@@ -78,23 +90,29 @@ def main(args):
 
        # dataset and dataloader
        view_list = ['D435_image', 'wrist_image']
+       
+       img_goal = True  if kwargs['text_encoder'] == 'DecisionNCE-V' else False
+       if kwargs['dataset_name'] == 'airkitchen_lang':
+              img_goal = False
+       
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='',
-              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac-blur.json',
+              datalist=['/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac.json'],
               view_list=view_list,
+              img_goal=img_goal,
               **kwargs
        )
        
-       val_g_dataloader = AIRKitchenValDataLoader(
-              datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json',
-              view_list=view_list,
-              statistics=statistics,
-              **kwargs              
-       )
+       # val_g_dataloader = AIRKitchenValDataLoader(
+       #        datalist='/home/dodo/ljx/BearRobot/data/airkitchen/AIR-toykitchen-ac_machine_g.json',
+       #        view_list=view_list,
+       #        statistics=statistics,
+       #        **kwargs              
+       # )
 
-       with open(os.path.join(args.save_path, 'statistics.json'), 'w') as f:
+       # save the statistics for training dataset
+       with open(os.path.join(save_path, 'statistics.json'), 'w') as f:
               json.dump(statistics, f)
-
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion(view_num=len(view_list), 
                                                  output_dim=int(7 * args.ac_num),
@@ -104,7 +122,7 @@ def main(args):
        # trainer
        test_trainer = BCTrainer(agent, 
                                 rt1dataloader, 
-                                val_g_dataloader, 
+                                None, 
                                 wandb_logger, 
                                 None, 
                                 num_steps=int(args.steps), 
@@ -115,6 +133,7 @@ def main(args):
                                 save_freq=args.save_freq, 
                                 save_path=save_path,
                                 resume_path=args.resume,
+                                img_goal=img_goal,
                                 args=args
                      )
        test_trainer.train_steps()

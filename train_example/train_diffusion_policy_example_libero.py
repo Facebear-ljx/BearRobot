@@ -57,6 +57,10 @@ def get_args():
        parser.add_argument('--noise_data_path', default=None, type=str, help='noise data path')
        parser.add_argument('--minus_mean', default=False, type=boolean, help='minus the mean of embeddings')
        parser.add_argument('--mean_data_path', default=None, type=str, help='mean data path')
+       parser.add_argument('--lang_prop', default="", type=str, help='language proportion')
+       parser.add_argument('--json_copy', default=0, type=int, help='json copy index')
+       parser.add_argument('--cos_noise', default=1.0, type=float, help='cosine noise')
+       parser.add_argument('--cos_noise_decay', default=0.0, type=float, help='cosine noise decay')
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    
@@ -82,9 +86,30 @@ def main(args):
        view_list = ['D435_image', 'wrist_image']
        
        img_goal = True  if kwargs['text_encoder'] == 'DecisionNCE-V' else False
+
        dataset_name = kwargs['dataset_name']
-       json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac.json'
-       # json_path = f'/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/{dataset_name}-ac.json'
+       
+              
+       if args.lang_prop == "":
+              if dataset_name=='libero130':
+                     if args.json_copy >= 10:
+                            json_path = "/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/libero130-ac-llm.json"
+                     elif args.json_copy >= 1:
+                            json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac-copy{args.json_copy}.json'
+                     else:
+                            json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac.json'
+              else:
+                     if args.json_copy == 1:
+                            json_path = f'/home/dodo/ljx/BearRobot/data/libero/{dataset_name}-ac.json'
+                     elif args.json_copy == 0:
+                            json_path = f'/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/{dataset_name}-ac.json'
+                     else:
+                            print("json copy index error")
+       else:
+              json_path = f'/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/json_prop/{dataset_name}-{args.lang_prop}-ac.json'
+       print("Json path: ", json_path)
+
+              
        rt1dataloader, statistics = AIRKitchenDataLoader(
               base_dir='/home/dodo/ljx/BearRobot/data/libero/dataset/',
               # base_dir='/home/dodo/.zh1hao_space/bear_branch/BearRobot/data/libero/dataset/',

@@ -13,10 +13,10 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 from torchvision import transforms
 
-from BearRobot.utils import ddp
+import ddp
 from torch.utils.data import DistributedSampler
-from data.libero.data_process import demo2frames
-from data.libero.data_process import get_libero_frame
+import demo2frames
+import get_libero_frame
 from mmengine import fileio
 import io
 import re
@@ -478,7 +478,7 @@ class AIRKitchenDataset():
                      else:
                             new_data = data
                      self.datalist += new_data
-                                      
+                     
               self._statistics(statistics)
               
               if transform_list == None:

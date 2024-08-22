@@ -25,3 +25,4 @@ pretrained_model/
 *.h5
 *.pth
 *.ipynb
+*.pdf

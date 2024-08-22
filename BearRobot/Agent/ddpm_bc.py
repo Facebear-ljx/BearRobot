@@ -11,6 +11,7 @@ from PIL import Image
 from BearRobot.Agent.base_agent import BaseAgent
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
 from BearRobot.Net.my_model.t5 import T5Encoder
+from BearRobot.Net.my_model.clip_encoder import ClipEncoder
 from BearRobot.Net.encoder.DecisionNCE import DecisionNCE_encoder, DecisionNCE_lang, DecisionNCE_visual_diff
 from BearRobot.Net.my_model.Align_net import AlignNet
 
@@ -326,7 +327,7 @@ class VLDDPM_BC(DDPM_BC):
               super().__init__(policy, beta, T, ac_num)
               
               # self.img_size = self.policy.img_size
-              assert text_encoder in ['T5', 'DecisionNCE-T', 'DecisionNCE-P', "DecisionNCE-V"]
+              assert text_encoder in ['T5', 'DecisionNCE-T', 'DecisionNCE-P', "DecisionNCE-V", "CLIP"]
               if text_encoder == 'T5':
                      self.lang_encoder = T5Encoder(device=device)
               elif text_encoder in ['DecisionNCE-T', 'DecisionNCE-P']:
@@ -337,10 +338,14 @@ class VLDDPM_BC(DDPM_BC):
                      # text_encoder = 'DecisionNCE-T_all_680ep'
                      # text_encoder = 'DecisionNCE-T_epick'
                      # text_encoder = 'DecisionNCE-T_all_filter_1200ep'
-                     text_encoder = 'DecisionNCE-T_all_endbegin_10800ep'
+                     # text_encoder = 'DecisionNCE-T_all_endbegin_10800ep'
+                     # text_encoder = 'DecisionNCE-T_all_3000ep'
+                     text_encoder = 'r50_frozen_7800ep'
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
                      self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder)
                      self.lang_encoder = DecisionNCE_visual_diff(mm_encoder)
+              elif text_encoder == "CLIP":
+                     self.lang_encoder = ClipEncoder(device=device)
               else:
                      raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")
@@ -348,13 +353,17 @@ class VLDDPM_BC(DDPM_BC):
               
               try:
                      self.add_noise = kwargs['add_noise']
+                     self.cos_noise = kwargs['cos_noise']
+                     self.cos_noise_decay = kwargs['cos_noise_decay']
                      self.noise_data_path = kwargs['noise_data_path']
                      self.noise_data = np.load(self.noise_data_path)
                      self.noise_std = self.noise_data['std_noise']
               except:
                      self.add_noise = False
                      self.noise_data_path = 'WRONG LOGIC PATH'
-                     
+              print("_____________________________")
+              print("slef.cos_noise:", self.cos_noise)
+              print("1-self.cos_noise:", self.cos_noise_decay)
               try:
                      self.minus_mean = kwargs['minus_mean']
                      self.mean_data_path = kwargs['mean_data_path']
@@ -389,11 +398,49 @@ class VLDDPM_BC(DDPM_BC):
               img_begin = cond['img_begin']
               img_end = cond['img_end']
               texts = cond['lang']
+              
+              # # 找到所有空字符串的索引
+              # empty_indices = [index for index, value in enumerate(texts) if value == '']
+              # non_empty_indices = [index for index, value in enumerate(texts) if value != '']
+              
+              # if len(non_empty_indices) == len(texts):
+              #        text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
+              #        loss = self.policy_loss(action_gt, images, text_emb, state, img_goal)
+              #        loss_dict = {"policy_loss": loss}
+              #        return loss_dict
+ 
+              # # 使用空字符串和非空字符串的索引分割文本和图片数据
+              # empty_texts = [texts[i] for i in empty_indices]
+              # non_empty_texts = [texts[i] for i in non_empty_indices]
+
+              # empty_images_begin = img_begin[empty_indices]
+              # non_empty_images_begin = img_begin[non_empty_indices]
+              
+              # empty_images_end = img_end[empty_indices]
+              # non_empty_images_end = img_end[non_empty_indices]
+
+              # visual_diff_emb = self.frame_diff_encoder.embed_frame(empty_images_begin, empty_images_end).to(images.device).detach()
+              # text_emb = self.lang_encoder.embed_text(non_empty_texts).to(images.device).detach()
+              
+              # cond_tensor = torch.cat([visual_diff_emb, text_emb], dim=0).detach()
+
+              # mix_cond = torch.empty_like(cond_tensor)
+              
+              # # 根据索引将处理后的图片数据插入到重构tensor中
+              # for idx, empty_index in enumerate(empty_indices):
+              #        mix_cond[empty_index] = visual_diff_emb[idx]
+
+              # for idx, non_empty_index in enumerate(non_empty_indices):
+              #        mix_cond[non_empty_index] = text_emb[idx]
+              
+              # loss = self.policy_loss(action_gt, images, mix_cond, state, img_goal)
+              # loss_dict = {"policy_loss": loss}
+              # return loss_dict
        
               if img_goal:
                      if img_begin != None and img_end != None:      
-                            text_emb_visiual_diff = self.frame_diff_encoder.embed_frame(img_begin, img_end).to(images.device).detach()
-                            loss = self.policy_loss(action_gt, images, text_emb_visiual_diff, state, img_goal)
+                            visual_diff_emb = self.frame_diff_encoder.embed_frame(img_begin, img_end).to(images.device).detach()
+                            loss = self.policy_loss(action_gt, images, visual_diff_emb, state, img_goal)
                             loss_dict = {"policy_loss": loss}
                             return loss_dict
                      else:
@@ -442,12 +489,8 @@ class VLDDPM_BC(DDPM_BC):
               Return: [B, D_a] predicted noise
               '''
               mod_cond = condition.clone()
+              # print("mod_cond origin type:", mod_cond.dtype)
               
-              # corrupt
-              # if self.add_noise and self.training:
-              #        std_dev = torch.tensor(self.noise_std)
-              #        condition += torch.randn_like(condition, device=self.device) * std_dev
-                     
               # collapse
               if self.minus_mean:
                      
@@ -457,43 +500,27 @@ class VLDDPM_BC(DDPM_BC):
                             mean_cond_emb = torch.from_numpy(self.mean_lang_emb).to(self.device)
                      mod_cond -= mean_cond_emb
                      
-                     # if self.lang_fit_img:
-                     #        mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
-                     #        print("after plus cond[222]: ", mod_cond[0][222])
-                            
-              # if self.add_noise and not self.minus_mean:
-              #        mod_cond -= torch.from_numpy(self.mean_lang_emb).to(self.device)
-              #        mod_cond += torch.from_numpy(self.mean_traj_emb).to(self.device)
-              
-              # if not self.training and  not img_goal:
-              #        mod_cond.to(self.device)
-              #        mod_cond = self.align_net(mod_cond)
-              
+
               # noise add method
               if self.add_noise and self.training:
                      
                      # std noise
-                     dtype = mod_cond.dtype
-                     gaussian_noise = np.random.normal(loc=0.0, scale=self.noise_std*0.1, size=self.noise_std.shape)
-                     mod_cond = mod_cond + torch.from_numpy(gaussian_noise).to(self.device).to(dtype)
-                     mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+                     # dtype = mod_cond.dtype
+                     # gaussian_noise = np.random.normal(loc=0.0, scale=self.noise_std*0.1, size=self.noise_std.shape)
+                     # mod_cond = mod_cond + torch.from_numpy(gaussian_noise).to(self.device).to(dtype)
+                     # mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
                      
-                     # rand_cos = 0.6 + 0.4*torch.rand(int(mod_cond.shape[0])).to(self.device)
-                     # mod_cond = generate_vector_with_given_cosine_similarity(mod_cond, rand_cos)
+                     # cos noise
+                     rand_cos = self.cos_noise + self.cos_noise_decay*torch.rand(int(mod_cond.shape[0])).to(self.device)
+                     mod_cond = generate_vector_with_given_cosine_similarity(mod_cond, rand_cos)
+                     # print("mod_cond type:", mod_cond.dtype)
               
               else:
                      mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
+                     mod_cond = mod_cond.to(torch.float)
+                     # print("mod_cond type:", mod_cond.dtype)
                      
               
-              # mod_cond = self.rank_transform_by_abs(mod_cond)
-              # mod_cond = mod_cond[:, self.sort_data]
-                     
-              # mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
-              # rand_cos = 0.7 + 0.3*torch.rand(int(mod_cond.shape[0])).to(self.device)
-              # mod_cond = generate_vector_with_given_cosine_similarity(mod_cond, rand_cos)
-              
-              # mod_cond += (torch.randn_like(mod_cond, device=self.device) * 0.1)
-              # mod_cond = mod_cond / torch.norm(mod_cond, dim=-1, keepdim=True)
                      
               noise_pred = self.policy(xt, t, imgs, mod_cond, state)
               return noise_pred

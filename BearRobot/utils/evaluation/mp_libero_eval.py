@@ -22,6 +22,7 @@ import multiprocessing
 from functools import partial
 import imageio
 
+import re
 
 EPS = 1e-5
 LIBERO_DATASETS = {'libero_goal': ["libero_goal"],
@@ -141,6 +142,9 @@ class LIBEROEval(BaseEval):
 
               # return the environment
               env_dict['env'] = env
+              print("[INFO] Origin task description: ", task_description)
+              # task_description = self.get_modified_text(task_description)
+              print("[INFO] Modified task description: ", task_description)
               env_dict['language_instruction'] = task_description
               env_dict['obs'] = obs
               
@@ -283,3 +287,46 @@ class LIBEROEval(BaseEval):
        def close_env(self):
               for env in self.env:
                      env['env'].close()
+                     
+       def modify_text(self, text):
+              # 定义可能的语言风格变化
+              replacements = [
+                     (r'\bthe\b', lambda match: random.choice(['that', 'this', 'a', 'the'])),
+                     (r'\bon\b', lambda match: random.choice(['on top of', 'onto', 'over'])),
+                     (r'\binto\b', lambda match: random.choice(['inside', 'within'])),
+                     (r'\bin\b', lambda match: random.choice(['inside of', 'within', 'in'])),
+                     (r'\band\b', lambda match: random.choice(['and then', 'and afterwards']))
+              ]
+              
+              # replacements = [
+              # (r'\bthe\b', lambda match: random.choice(['this', 'that', 'those', 'these', 'any', 'a'])),
+              # (r'\bon\b', lambda match: random.choice(['upon', 'over', 'across', 'atop'])),
+              # (r'\bin\b', lambda match: random.choice(['within', 'inside of', 'inside', 'enclosed by', 'amid'])),
+              # (r'\band\b', lambda match: random.choice(['plus', 'along with', 'in addition to', 'also', 'as well as', 'furthermore'])),
+              # (r'\bto\b', lambda match: random.choice(['towards', 'into', 'in the direction of', 'for', 'until'])),
+              # (r'\bof\b', lambda match: random.choice(['from', 'out of', 'belonging to', 'regarding', 'concerning']))
+              # ]
+
+              
+              modified_text = text
+              for pattern, replacement_func in replacements:
+                     modified_text = re.sub(pattern, replacement_func, modified_text)
+
+              return modified_text
+       
+       # 返回修改后的文本的函数
+       def get_modified_text(self, input_text):
+              # 修改后的文本映射字典
+              modified_texts = {
+              'put the bowl on the stove': 'place the bowl onto the stove',
+              'put the bowl on the plate': 'place the bowl onto the plate',
+              'put the bowl on top of the cabinet': 'place the bowl on the cabinet top',
+              'put the cream cheese in the bowl': 'place the cream cheese into the bowl',
+              'push the plate to the front of the stove': 'move the plate to the front of the stove',
+              'open the top drawer and put the bowl inside': 'open the upper drawer and place the bowl within',
+              'open the middle drawer of the cabinet': 'open the central drawer of the cabinet',
+              'put the wine bottle on the rack': 'place the wine bottle on the rack',
+              'put the wine bottle on top of the cabinet': 'place the wine bottle atop the cabinet',
+              'turn on the stove': 'activate the stove'
+              }
+              return modified_texts.get(input_text, "Text not found in the predefined list")

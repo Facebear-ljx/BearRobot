@@ -228,7 +228,7 @@ class BCTrainer:
                                           evaluate = True
                                    
                                    if evaluate:
-                                          self.evaluator.eval_episodes(self.agent, step, self.save_path, img_goal=True) 
+                                          # self.evaluator.eval_episodes(self.agent, step, self.save_path, img_goal=True) 
                                           self.evaluator.eval_episodes(self.agent, step, self.save_path, img_goal=False) 
                             
                             if self.args.ddp:
