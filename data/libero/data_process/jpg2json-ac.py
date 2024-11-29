@@ -13,6 +13,8 @@ data = []
 count = 0
 for dataset in tqdm(dataset_lists):
     print(dataset)
+    if dataset != "libero_90":
+        continue
     dataset_dir = os.path.join(base_dir, dataset)
     task_lists = os.listdir(dataset_dir)
     
@@ -48,5 +50,5 @@ for dataset in tqdm(dataset_lists):
                 count += 1
 
 print('done, data number:', count)
-with open("/home/dodo/ljx/BearRobot/data/libero/libero130-ac.json", 'w') as f:
+with open("/home/dodo/ljx/BearRobot/data/libero/libero90-ac.json", 'w') as f:
     json.dump(data, f, indent=4)
