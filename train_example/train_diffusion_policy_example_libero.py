@@ -53,6 +53,8 @@ def get_args():
        parser.add_argument('--film_fusion', default=False, type=boolean, help='add film condition to the decoder')
        
        
+       parser.add_argument('--fill_gap', default=True, type=boolean, help='fill the modality gap via C3')
+       
        parser = diffusion_args(parser)
        args = parser.parse_args()    
        return args   

@@ -309,7 +309,7 @@ class VLDDPM_BC(DDPM_BC):
               elif text_encoder == "DecisionNCE-V":
                      text_encoder = 'DecisionNCE-T'
                      mm_encoder = DecisionNCE_encoder(text_encoder, device=device)
-                     self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder)
+                     self.frame_diff_encoder = DecisionNCE_visual_diff(mm_encoder, *args, **kwargs)
               else:
                      raise ValueError(f"Invalid text_encoder '{text_encoder}'. Expected one of: ['t5', 'DecisionNCE-T', 'DecisionNCE-P']")
               print("lang encoder load success")

@@ -1,11 +1,12 @@
 bs=64
 ws=2
-text_encoder=DecisionNCE-T
+text_encoder=DecisionNCE-V
+dataset_name=libero30
 for seed in 42; do
 export CUDA_VISIBLE_DEVICES=1
 export WANDB_API_KEY=cfbf81ce9bd7daca9d32f4bd1dbf26e8c93310c3
 torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_example_libero.py \
-    --dataset_name 'libero_goal' \
+    --dataset_name $dataset_name \
     --algo_name 'diffusion visual motor' \
     --ddp False \
     --img_size 128 \
@@ -34,7 +35,7 @@ torchrun --standalone --nnodes=1 --nproc-per-node=1 train_diffusion_policy_examp
     --save True \
     --save_freq 50000 \
     --T 25 \
-    --save_path ../experiments/libero/libero_goal/diffusion/resnet34_wstate_0613_$text_encoder \
-    --log_path ../experiments/libero/libero_goal/diffusion/resnet34_wstate_0613_$text_encoder \
+    --save_path ../experiments/libero/$dataset_name/diffusion/resnet34_wstate_0711_fillgap_$text_encoder \
+    --log_path ../experiments/libero/$dataset_name/diffusion/resnet34_wstate_0711_fillgap_$text_encoder \
     --port 2050
 done
