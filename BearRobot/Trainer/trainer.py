@@ -61,7 +61,7 @@ class BCTrainer:
                           
               # ddp & model
               if args.ddp:
-                     agent.policy = DDP(agent.policy, device_ids=[device], find_unused_parameters=False)
+                     agent.policy = DDP(agent.policy, device_ids=[device], find_unused_parameters=True)
               self.agent = agent
               
               # dataloader

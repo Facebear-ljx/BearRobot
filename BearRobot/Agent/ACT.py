@@ -34,7 +34,8 @@ class ACTAgent(BaseAgent):
               text_encoder = 't5',
               kl_weight: float=10,
               loss_type: str="l1",
-              device = 'cuda'
+              device = 'cuda',
+              *args, **kwargs
        ):
               super().__init__(
                      policy,
@@ -51,18 +52,27 @@ class ACTAgent(BaseAgent):
                      self.loss_fn = nn.L1Loss()
               elif loss_type == 'l2':
                      self.loss_fn = nn.MSELoss()
+              elif loss_type == 'huber':
+                     self.loss_fn = nn.HuberLoss(delta=0.1)
               else:
-                     raise ValueError(f"{loss_type} is not supported, only support l1 and l2 loss")
+                     raise ValueError(f"{loss_type} is not supported, only support l1, l2 and huber loss")
               self.device = device
 
-       def forward(self, images: torch.Tensor, texts: list, action_gt: torch.Tensor, state=None):
+       def forward(self, images: torch.Tensor, cond: list, action_gt: torch.Tensor, state=None, img_goal=False):
               '''
               calculate ACT loss (L1 or L2) and CVAE loss
               # images: batch of frames of different views, [B, Frame, View, C, H, W]
-              # texts: list of instructions
+              # cond: dict of goals: {'lang', 'img_begin', 'img_end'}
               # state shape [B, D_s], batch of robot arm x,y,z, gripper state, et al
               # action_gt shape [B, D_a], batch of robot control value, e.g., delta_x, delta_y, delta_z,..., et al.
+              # image_goal, bool, True: use image as goal (not implemented), False: use language as goal
               '''
+              assert img_goal==False # only support language goal now
+              img_begin = cond['img_begin']
+              img_end = cond['img_end']
+              texts = cond['lang']
+              assert texts is not None  # must have text condition
+              
               text_emb = self.lang_encoder.embed_text(texts).to(images.device).detach()
               B, _ = action_gt.shape
               action_gt = action_gt.reshape(B, -1, 7)
