@@ -469,6 +469,17 @@ class VLDDPM_BC(DDPM_BC):
               # action = action * a_std + a_mean
               return action
        
+       @torch.no_grad()
+       def forward_loss_test(self, imgs, lang, action_gt, img_begin=None, img_end=None, img_goal=False):
+              imgs = torch.stack([self.transform(Image.fromarray(frame).convert("RGB")) for frame in imgs]).unsqueeze(0).unsqueeze(0).to('cuda')
+
+              action_gt = torch.from_numpy(action_gt.astype(np.float32)).unsqueeze(0).to('cuda')
+
+              text_emb = self.lang_encoder.embed_text([lang]).to(imgs.device).detach()
+
+              loss = self.policy_loss(action_gt, imgs, text_emb, None)
+
+              return loss
 
 class IDQL_Agent(BaseAgent):
        def __init__(

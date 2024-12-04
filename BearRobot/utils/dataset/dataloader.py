@@ -462,6 +462,7 @@ class AIRKitchenDataset():
               for one_list in datalist:
                      data = openjson(one_list)
                      self.datalist += data
+              print(f"Dataset size: {len(self.datalist)}")
                      
               self._statistics(statistics)
               
@@ -563,13 +564,15 @@ class AIRKitchenDataset():
               
               # state
               state = torch.tensor(state)
+              random_noise = torch.randn_like(state) * math.sqrt(0.001)  # proprio data augmentation, std = 0.001 (similar to the execution noise in the controller)
+              state = state + random_noise
               state = (state - self.s_mean) / self.s_std
                             
               # images
               images = [openimage(img_path) for img_path in imgs_path]
               if self.mask_aug:
                      images[0] = self.aug_mask(step, images[0])           
-              images = torch.cat([self.transform(image).unsqueeze(0).unsqueeze(0) for image in images], dim=1)
+              images = torch.cat([self.transform(image).unsqueeze(0).unsqueeze(0) for image in images], dim=1) # F x V x C x H x W
 
               return_dict = {"imgs": images,
                             "label": action,

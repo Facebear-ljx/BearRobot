@@ -86,7 +86,9 @@ def load_ckpt(agent, ckpt_path):
                 new_ckpt[new_key] = ckpt['model'][key]
 
         ckpt['model'] = new_ckpt
-        agent.load_state_dict(ckpt['model'])
+        print("---------------------------------------------------------")
+        print(ckpt['model'].keys())
+        print(agent.load_state_dict(ckpt['model']))
         agent.eval()
         return agent.to(0)
 
@@ -104,7 +106,7 @@ def build_ACT(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_
 
 def build_visual_diffsuion(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_path: str=None):
         kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
-        model = VisualDiffusion(view_num=2,
+        model = VisualDiffusion(view_num=3,
                                 output_dim=7 * kwargs['ac_num'],
                                 **kwargs).to(0)
         agent = VLDDPM_BC(model, T=kwargs['T'], beta=kwargs['beta'], ac_num=kwargs['ac_num'], text_encoder=kwargs['text_encoder']) 
