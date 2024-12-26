@@ -6,7 +6,7 @@ import torch
 import numpy as np
 
 from BearRobot.Net.my_model.diffusion_model import VisualDiffusion
-from BearRobot.Agent.ddpm_bc import VLDDPM_BC
+from BearRobot.Agent.cfm_agent import VLCFM_BC
 
 from BearRobot.utils.dataset.dataloader import RT1DataLoader, RT1ValDataLoader, AIRKitchenDataLoader, AIRKitchenValDataLoader
 from BearRobot.utils.logger.tb_log import TensorBoardLogger as Logger
@@ -26,9 +26,10 @@ def get_args():
        # customize your argparser
        parser.add_argument('--img_size', default=224, type=int, help='image size')
        parser.add_argument('--frames', default=1, type=int, help='frames num input to the visual encoder')
-       parser.add_argument('--visual_encoder', default='resnet34', type=str, help='visual encoder backbone, support resnet 18/34/50')
+       parser.add_argument('--visual_encoder', default='resnet18', type=str, help='visual encoder backbone, support resnet 18/34/50')
        parser.add_argument('--visual_pretrain', default=True, type=boolean, help='whether use visual pretrain')
        parser.add_argument('--ft_vision', default=True, type=boolean, help='whether tune the visual encoder')
+       parser.add_argument('--text_encoder', default='T5', type=str, help='language encoder, support T5, DecisionNCE-T, DecisionNCE-P, DecisionNCE-V')   
        
        parser.add_argument('--ac_num', default=4, type=int, help='action trunking number')
        parser.add_argument('--norm', default="minmax", type=str, help='whether norm the action or not')
@@ -44,8 +45,9 @@ def get_args():
        parser.add_argument('--add_spatial_coordinates', default=False, type=boolean, help='add spatial coordinates to the image')
        parser.add_argument('--film_fusion', default=False, type=boolean, help='add film condition to the decoder')
        
-       parser.add_argument('--view_list', default=['top_image', 'wrist_image', 'side_image'], nargs='+', help='image view list')
-       parser.add_argument('--datalist', default=None, nargs='+', help='datalist path')
+       parser.add_argument('--base_dir', default='/data', help='the base directory for the dataset')
+       parser.add_argument('--view_list', default=['D435_image', 'wrist_image'], nargs='+', help='image view list')
+       parser.add_argument('--datalist', default=['/home/dodo/ljx/BearRobot/data/libero/libero_goal-ac-10.json'], nargs='+', help='datalist path')
        
        parser = diffusion_args(parser)
        args = parser.parse_args()    
@@ -80,7 +82,6 @@ def main(args):
        print("image_view:", kwargs['view_list'])
        print("datalist_path:", kwargs['datalist'])
        dataloader, statistics = AIRKitchenDataLoader(
-              base_dir='',
               transform_list=transform_list,
               **kwargs
        )
@@ -106,11 +107,15 @@ def main(args):
        
        print("(TRAINING): INITIALIZE AGENT")
        
+       # evaluator
+       from BearRobot.utils.evaluation.mp_libero_eval import LIBEROEval
+       evaluator = LIBEROEval(task_suite_name=kwargs['dataset_name'], data_statistics=None, eval_horizon=300, num_episodes=10, logger=wandb_logger, rank=global_rank, json_path=kwargs['datalist'][0])
+       
        # agent and the model for agent
        visual_diffusion_policy = VisualDiffusion(view_num=len(kwargs['view_list']), 
                                                  output_dim=int(7 * args.ac_num),
                                                  **kwargs).to(rank)
-       agent = VLDDPM_BC(policy=visual_diffusion_policy, **kwargs)      
+       agent = VLCFM_BC(policy=visual_diffusion_policy, **kwargs)      
        agent.get_statistics(os.path.join(args.save_path, 'statistics.json'))
        agent.get_transform(img_size=0, transform_list=transform_list)
        print("(TRAINING): AGENT INITIALIZED DONE")
@@ -119,7 +124,7 @@ def main(args):
                                 dataloader, 
                                 dataloader, 
                                 wandb_logger, 
-                                None, 
+                                evaluator, 
                                 num_steps=int(args.steps), 
                                 lr=args.lr, 
                                 device=rank,

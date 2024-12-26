@@ -87,6 +87,7 @@ def load_ckpt(agent, ckpt_path):
 
         ckpt['model'] = new_ckpt
         print("---------------------------------------------------------")
+        print("the model training steps:", ckpt['step'])
         print(ckpt['model'].keys())
         print(agent.load_state_dict(ckpt['model']))
         agent.eval()
@@ -96,7 +97,6 @@ def load_ckpt(agent, ckpt_path):
 def build_ACT(ckpt_path: str, statistics_path: str, wandb_name: str=None, wandb_path: str=None):
         kwargs = wandb_yaml2dict(ckpt_path, wandb_name, wandb_path=wandb_path)
         model = ACTModel(output_dim=7,
-                         dim_feedforward=3200,
                          **kwargs).to(0)
         agent = ACTAgent(model)
         agent.get_statistics(statistics_path)

@@ -220,22 +220,23 @@ class VLCFM_BC(CFM_BC):
               batch_size = x1.shape[0]
               
               x0 = torch.randn_like(x1, device=self.device)
-              t = torch.randint(0, self.num_timesteps, (batch_size, ), device=self.device)
+              t = torch.rand((batch_size, 1), device=self.device)
               xt, v_gt = self.q_sample(x0, x1, t)
               
               v_pred = self.policy(xt, t, imgs, condition, state)
               loss = (((v_pred - v_gt) ** 2).sum(axis = -1)).mean()
               return loss
 
-       def wrapped_model(self):
+       def wrapped_model(self, imgs, cond, state):
               class WrappedModel(ModelWrapper):
-                     def __init__(
-                            self, 
+                     def __init__( 
+                            self,
+                            policy,
                             imgs,
                             cond,
                             state,
                      ):
-                            super().__init__()
+                            super().__init__(model=policy)
                             self.imgs = imgs
                             self.cond = cond
                             self.state = state
@@ -244,7 +245,7 @@ class VLCFM_BC(CFM_BC):
                             t = t.reshape(1, 1).repeat(x.shape[0], 1)
                             return self.model(x, t, self.imgs, self.cond, self.state)
               
-              self.wrapped_policy = WrappedModel(self.policy)    
+              self.wrapped_policy = WrappedModel(self.policy, imgs, cond, state)    
        
        
        @torch.no_grad()
@@ -271,9 +272,9 @@ class VLCFM_BC(CFM_BC):
               else:
                      cond = self.lang_encoder.embed_text(lang) if self.lang_encoder is not None else lang     
                  
-              cond = cond.repeat(x.shape[0], 1)
-              imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
-              state = state.repeat(x,shape[0], 1)
+              # cond = cond.repeat(x.shape[0], 1)
+              # imgs = imgs.repeat(x.shape[0], *((1,) * (len(imgs.shape) - 1)))
+              # state = state.repeat(x.shape[0], 1)
               
               # for t in reversed(range(self.num_timesteps)):
               #        t_tensor = torch.tensor([t]).unsqueeze(0).repeat(x.shape[0], 1).to(self.device)
@@ -285,8 +286,8 @@ class VLCFM_BC(CFM_BC):
 
               self.wrapped_model(imgs, cond, state)
               x_init = torch.randn(shape).to(self.device)
-              T = torch.linspace(0, 1, self.num_timesteps)  # sample times
-              step_size = 1 / T
+              T = torch.linspace(0, 1, self.num_timesteps).to(self.device)  # sample times
+              step_size = 1 / self.num_timesteps
               
               solver = ODESolver(velocity_model=self.wrapped_policy)  # create an ODESolver class
               sol = solver.sample(time_grid=T, x_init=x_init, method='midpoint', step_size=step_size, return_intermediates=False)  # sample from the model
