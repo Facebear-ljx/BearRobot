@@ -42,6 +42,8 @@ def get_args():
        parser.add_argument('--kl_weight', default=10, type=float, help='KL-divergence weight')    
        parser.add_argument('--loss_type', default='huber', type=str, help='action loss, l1, l2, huber')   
 
+       parser.add_argument('--view_list', default=['top_image', 'wrist_image', 'side_image'], nargs='+', help='image view list')
+       parser.add_argument('--datalist', default=None, nargs='+', help='datalist path')
        args = parser.parse_args()
        return args   
 
@@ -70,11 +72,11 @@ def main(args):
        ]
 
        # dataset and dataloader
-       view_list = ['top_image', 'wrist_image', 'side_image']
+       print("-"*88)
+       print("image_view:", kwargs['view_list'])
+       print("datalist_path:", kwargs['datalist'])
        dataloader, statistics = AIRKitchenDataLoader(
               base_dir='',
-              datalist=['/home/dodo/ljx/BearRobot/data/airbot/newair_rel_eef_1203.json'],
-              view_list=view_list,
               transform_list=transform_list,
               **kwargs
        )
@@ -85,22 +87,27 @@ def main(args):
               save_path = args.save_path
               if not os.path.exists(save_path):
                      os.makedirs(save_path)
+                     print("save path {} created".format(save_path))
               
               # save the statistics for training dataset
               with open(os.path.join(save_path, 'statistics.json'), 'w') as f:
                      json.dump(statistics, f)
+                     print("statistics saved to {}".format(os.path.join(save_path, 'statistics.json')))
        else:
               save_path = None
 
         # logger
        wandb_logger = Logger(args.project_name, args.dataset_name, args, save_path=args.log_path, rank=global_rank) 
-
+       print("-"*88)
+       
+       print("(TRAINING): INITIALIZE AGENT")
        # agent and the model for agent
        model = ACTModel(output_dim=7,
                      **kwargs).to(rank)
        agent = ACTAgent(policy=model, **kwargs)
        agent.get_statistics(os.path.join(args.save_path, 'statistics.json'))
        agent.get_transform(img_size=args.img_size, transform_list=transform_list)
+       print("(TRAINING): AGENT INITIALIZED DONE")
 
        # trainer
        test_trainer = BCTrainer(agent, 

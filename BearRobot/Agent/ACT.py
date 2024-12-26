@@ -105,7 +105,7 @@ class ACTAgent(BaseAgent):
               raise ValueError("ACT agent is a BC agent, has no v value")
               
        @torch.no_grad()
-       def get_action(self, imgs, text: list, state=None):
+       def get_action(self, imgs, text: list, state=None, t=None, k=0.25):
               """
               get one action
               # imgs: one frames of different views, [1, Frame, View, C, H, W]
@@ -118,15 +118,20 @@ class ACTAgent(BaseAgent):
 
               state = torch.from_numpy(state.astype(np.float32)).view(1, -1) if state is not None else None
               state = (state - self.s_mean) / self.s_std if state is not None else None
+              state = state.to(imgs.device)
               
               text_emb = self.lang_encoder.embed_text([text]).to(imgs.device).detach()
               action, _, (_, _) = self.policy(state, imgs, cond=text_emb)
 
               action = action.squeeze(0).detach().cpu()
+              print(action.shape)
               N, _ = action.shape
               a_max = self.a_max.repeat(N, 1)
               a_min = self.a_min.repeat(N, 1)
               a_mean = self.a_mean.repeat(N, 1)
               a_std = self.a_std.repeat(N, 1)
-              action = (action + 1) * (a_max - a_min) / 2 + a_min
-              return action.numpy()
+              # action = (action + 1) * (a_max - a_min) / 2 + a_min
+              action = action * a_std + a_mean
+
+              action = self.get_ac_action(action.numpy(), t, k)
+              return action
